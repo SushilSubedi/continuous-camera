@@ -30,7 +30,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@continuous-camera/core": "workspace:*"
+    "@continuous-camera/core": "0.1.0"
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.2",
@@ -48,6 +48,9 @@
     "type": "git",
     "url": "https://github.com/SushilSubedi/continuous-camera.git",
     "directory": "packages/react"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "homepage": "https://github.com/SushilSubedi/continuous-camera/tree/main/packages/react",
   "bugs": {

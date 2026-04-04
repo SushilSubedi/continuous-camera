@@ -36,6 +36,9 @@
     "url": "https://github.com/SushilSubedi/continuous-camera.git",
     "directory": "packages/core"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "homepage": "https://github.com/SushilSubedi/continuous-camera/tree/main/packages/core",
   "bugs": {
     "url": "https://github.com/SushilSubedi/continuous-camera/issues"
