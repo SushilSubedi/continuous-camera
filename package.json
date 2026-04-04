@@ -1,0 +1,32 @@
+{
+  "name": "continuous-camera",
+  "private": true,
+  "description": "A framework-agnostic camera library with first-class React support",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SushilSubedi/continuous-camera.git"
+  },
+  "homepage": "https://github.com/SushilSubedi/continuous-camera",
+  "bugs": {
+    "url": "https://github.com/SushilSubedi/continuous-camera/issues"
+  },
+  "author": "Sushil Subedi",
+  "license": "MIT",
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev": "pnpm -r --parallel dev",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "clean": "pnpm -r clean"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "jsdom": "^29.0.1",
+    "typescript": "^5.5.0"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=18"
+  }
+}
