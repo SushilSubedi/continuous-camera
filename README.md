@@ -213,6 +213,17 @@ npm install
 npm run dev
 ```
 
+## Roadmap
+
+Near-term improvements focused on production use cases and customer customization:
+
+- Device selection by `deviceId`, not just front/back switching
+- Runtime camera updates with `applyConstraints()` and richer track controls
+- Access to camera capabilities and active settings for adaptive UIs
+- Richer capture controls such as crop, resize, mirror, and rotate
+- Lower-level preview hooks and overlay-friendly React primitives
+- Better lifecycle events for permission changes, device changes, and track endings
+
 ## Development
 
 ```bash
