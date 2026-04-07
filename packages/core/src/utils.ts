@@ -15,12 +15,20 @@ export function buildConstraints(options: CameraOptions): MediaStreamConstraints
 
   const resolution = options.resolution ?? { width: 1920, height: 1080 };
 
+  const video: MediaTrackConstraints = {
+    width: { ideal: resolution.width },
+    height: { ideal: resolution.height },
+  };
+
+  // deviceId takes precedence over facingMode
+  if (options.deviceId) {
+    video.deviceId = { exact: options.deviceId };
+  } else {
+    video.facingMode = options.facingMode ?? 'user';
+  }
+
   return {
-    video: {
-      facingMode: options.facingMode ?? 'user',
-      width: { ideal: resolution.width },
-      height: { ideal: resolution.height },
-    },
+    video,
     audio: options.audio ?? false,
   };
 }

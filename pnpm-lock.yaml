@@ -33,8 +33,8 @@ importers:
   packages/react:
     dependencies:
       '@continuous-camera/core':
-        specifier: 0.1.0
-        version: 0.1.0
+        specifier: workspace:*
+        version: link:../core
     devDependencies:
       '@testing-library/react':
         specifier: ^16.3.2
@@ -89,9 +89,6 @@ packages:
   '@bramus/specificity@2.4.2':
     resolution: {integrity: sha512-ctxtJ/eA+t+6q2++vj5j7FYX3nRu311q1wfYH3xjlLOsczhlhxAg2FWNUXhpGvAw3BWo1xBcvOV6/YLc2r5FJw==}
     hasBin: true
-
-  '@continuous-camera/core@0.1.0':
-    resolution: {integrity: sha512-scDh20TtAikDiEi7E4OA94zpEOmTHQwvZZqowky3siiZQY0CE+9lYbt3bK03+04JcJiuZYGgnduoEvUbrLzyyA==}
 
   '@csstools/color-helpers@6.0.2':
     resolution: {integrity: sha512-LMGQLS9EuADloEFkcTBR3BwV/CGHV7zyDxVRtVDTwdI2Ca4it0CCVTT9wCkxSgokjE5Ho41hEPgb8OEUwoXr6Q==}
@@ -1199,8 +1196,6 @@ snapshots:
   '@bramus/specificity@2.4.2':
     dependencies:
       css-tree: 3.2.1
-
-  '@continuous-camera/core@0.1.0': {}
 
   '@csstools/color-helpers@6.0.2': {}
 

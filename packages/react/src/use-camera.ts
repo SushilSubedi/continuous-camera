@@ -17,6 +17,14 @@ export interface UseCameraReturn {
   stop: () => void;
   /** Switch between front/back cameras */
   switchCamera: () => Promise<MediaStream>;
+  /** Select a specific camera by deviceId */
+  selectDevice: (deviceId: string) => Promise<MediaStream>;
+  /** Apply constraints to the active video track without restarting */
+  applyConstraints: (constraints: MediaTrackConstraints) => Promise<void>;
+  /** Get capabilities of the active video track */
+  getCapabilities: () => MediaTrackCapabilities | null;
+  /** Get current settings of the active video track */
+  getSettings: () => MediaTrackSettings | null;
   /** Capture a still frame as a Blob */
   capture: (options?: CaptureOptions) => Promise<Blob>;
   /** List available video input devices */
@@ -67,6 +75,24 @@ export function useCamera(options: CameraOptions = {}): UseCameraReturn {
     return cameraRef.current.switchCamera();
   }, []);
 
+  const selectDevice = useCallback(async (deviceId: string) => {
+    if (!cameraRef.current) throw new Error('Camera not initialized');
+    return cameraRef.current.selectDevice(deviceId);
+  }, []);
+
+  const applyConstraints = useCallback(async (constraints: MediaTrackConstraints) => {
+    if (!cameraRef.current) throw new Error('Camera not initialized');
+    return cameraRef.current.applyConstraints(constraints);
+  }, []);
+
+  const getCapabilities = useCallback(() => {
+    return cameraRef.current?.getCapabilities() ?? null;
+  }, []);
+
+  const getSettings = useCallback(() => {
+    return cameraRef.current?.getSettings() ?? null;
+  }, []);
+
   const capture = useCallback(async (captureOptions?: CaptureOptions) => {
     if (!cameraRef.current) throw new Error('Camera not initialized');
     return cameraRef.current.capture(captureOptions);
@@ -85,6 +111,10 @@ export function useCamera(options: CameraOptions = {}): UseCameraReturn {
     start,
     stop,
     switchCamera,
+    selectDevice,
+    applyConstraints,
+    getCapabilities,
+    getSettings,
     capture,
     getDevices,
     camera: cameraRef.current!,

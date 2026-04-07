@@ -1,4 +1,4 @@
-import { Camera } from './camera';
+import { Camera } from "./camera";
 import type {
   CameraOptions,
   CameraState,
@@ -6,11 +6,12 @@ import type {
   CameraEventMap,
   CameraEventHandler,
   CaptureOptions,
+  CropRegion,
   Resolution,
-} from './types';
+} from "./types";
 
 export { Camera };
-export { isMediaDevicesSupported, isBrowser } from './utils';
+export { isMediaDevicesSupported, isBrowser } from "./utils";
 export type {
   CameraOptions,
   CameraState,
@@ -18,6 +19,7 @@ export type {
   CameraEventMap,
   CameraEventHandler,
   CaptureOptions,
+  CropRegion,
   Resolution,
 };
 
