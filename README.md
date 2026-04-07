@@ -119,6 +119,10 @@ Factory function that creates a new `Camera` instance.
 | `stop()` | `void` | Stops all tracks and releases the camera |
 | `capture(options?)` | `Promise<Blob>` | Captures a still frame from the active stream |
 | `switchCamera()` | `Promise<MediaStream>` | Toggles between front and back cameras |
+| `selectDevice(deviceId)` | `Promise<MediaStream>` | Switches to a specific camera by deviceId |
+| `applyConstraints(constraints)` | `Promise<void>` | Applies constraints to the active track without restarting |
+| `getCapabilities()` | `MediaTrackCapabilities \| null` | Returns capabilities of the active video track |
+| `getSettings()` | `MediaTrackSettings \| null` | Returns current settings of the active video track |
 | `getDevices()` | `Promise<MediaDeviceInfo[]>` | Lists available video input devices |
 | `on(event, handler)` | `() => void` | Subscribes to events, returns unsubscribe fn |
 | `off(event, handler)` | `void` | Unsubscribes from events |
@@ -136,6 +140,7 @@ Factory function that creates a new `Camera` instance.
 ```ts
 interface CameraOptions {
   facingMode?: 'user' | 'environment';   // Default: 'user'
+  deviceId?: string;                     // Select camera by deviceId
   resolution?: { width: number; height: number }; // Default: 1920×1080
   audio?: boolean;                       // Default: false
   constraints?: MediaStreamConstraints;  // Raw override
@@ -147,7 +152,11 @@ interface CameraOptions {
 ```ts
 interface CaptureOptions {
   format?: 'image/jpeg' | 'image/png' | 'image/webp'; // Default: 'image/jpeg'
-  quality?: number; // 0–1, Default: 0.92
+  quality?: number;   // 0–1, Default: 0.92
+  crop?: { x: number; y: number; width: number; height: number };
+  resize?: { width: number; height: number };
+  mirror?: boolean;   // Default: false
+  rotate?: 0 | 90 | 180 | 270; // Default: 0
 }
 ```
 
@@ -159,6 +168,8 @@ interface CaptureOptions {
 | `error` | `Error` | Fired when an error occurs |
 | `streamstart` | `MediaStream` | Fired when a stream starts |
 | `streamstop` | `void` | Fired when a stream stops |
+| `devicechange` | `MediaDeviceInfo[]` | Fired when a device is added or removed |
+| `trackended` | `void` | Fired when the active video track ends unexpectedly |
 
 ### `@continuous-camera/react`
 
@@ -175,6 +186,10 @@ interface UseCameraReturn {
   start: () => Promise<MediaStream>;
   stop: () => void;
   switchCamera: () => Promise<MediaStream>;
+  selectDevice: (deviceId: string) => Promise<MediaStream>;
+  applyConstraints: (constraints: MediaTrackConstraints) => Promise<void>;
+  getCapabilities: () => MediaTrackCapabilities | null;
+  getSettings: () => MediaTrackSettings | null;
   capture: (options?: CaptureOptions) => Promise<Blob>;
   getDevices: () => Promise<MediaDeviceInfo[]>;
   camera: Camera; // underlying Camera instance
@@ -183,13 +198,23 @@ interface UseCameraReturn {
 
 #### `<CameraPreview />`
 
-Renders a `<video>` element connected to a `MediaStream`.
+Renders a `<video>` element connected to a `MediaStream`. Supports overlay content via `children`.
 
 ```tsx
 interface CameraPreviewProps extends VideoHTMLAttributes {
   stream: MediaStream | null;
-  mirror?: boolean; // Default: false — mirrors video horizontally
+  mirror?: boolean;    // Default: false — mirrors video horizontally
+  children?: ReactNode; // Overlay content rendered on top of the video
 }
+```
+
+#### `useCameraPreview(stream)`
+
+Lower-level hook that binds a `MediaStream` to a `<video>` ref. Use this when you need full control over the video element.
+
+```tsx
+const videoRef = useCameraPreview(camera.stream);
+return <video ref={videoRef} autoPlay playsInline muted />;
 ```
 
 ## Browser Support
@@ -217,12 +242,12 @@ npm run dev
 
 Near-term improvements focused on production use cases and customer customization:
 
-- Device selection by `deviceId`, not just front/back switching
-- Runtime camera updates with `applyConstraints()` and richer track controls
-- Access to camera capabilities and active settings for adaptive UIs
-- Richer capture controls such as crop, resize, mirror, and rotate
-- Lower-level preview hooks and overlay-friendly React primitives
-- Better lifecycle events for permission changes, device changes, and track endings
+- ✅ Device selection by `deviceId`, not just front/back switching
+- ✅ Runtime camera updates with `applyConstraints()` and richer track controls
+- ✅ Access to camera capabilities and active settings for adaptive UIs
+- ✅ Richer capture controls such as crop, resize, mirror, and rotate
+- ✅ Lower-level preview hooks and overlay-friendly React primitives
+- ✅ Better lifecycle events for permission changes, device changes, and track endings
 
 ## Development
 

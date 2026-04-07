@@ -68,6 +68,32 @@ describe('buildConstraints()', () => {
     });
   });
 
+  it('uses deviceId when provided', () => {
+    const result = buildConstraints({ deviceId: 'cam-123' });
+    expect(result).toEqual({
+      video: {
+        deviceId: { exact: 'cam-123' },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+      },
+      audio: false,
+    });
+    expect((result.video as MediaTrackConstraints).facingMode).toBeUndefined();
+  });
+
+  it('deviceId takes precedence over facingMode', () => {
+    const result = buildConstraints({ deviceId: 'cam-123', facingMode: 'environment' });
+    expect(result).toEqual({
+      video: {
+        deviceId: { exact: 'cam-123' },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+      },
+      audio: false,
+    });
+    expect((result.video as MediaTrackConstraints).facingMode).toBeUndefined();
+  });
+
   it('uses raw constraints when provided', () => {
     const raw: MediaStreamConstraints = { video: true, audio: true };
     const result = buildConstraints({ constraints: raw });

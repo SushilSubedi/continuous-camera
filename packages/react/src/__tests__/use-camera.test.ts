@@ -9,6 +9,11 @@ function createMockTrack(): MediaStreamTrack {
     enabled: true,
     id: 'mock-track',
     label: 'Mock Camera',
+    applyConstraints: vi.fn().mockResolvedValue(undefined),
+    getCapabilities: vi.fn().mockReturnValue({}),
+    getSettings: vi.fn().mockReturnValue({}),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
   } as unknown as MediaStreamTrack;
 }
 
@@ -31,7 +36,7 @@ function setupMediaDevices() {
   ]);
 
   Object.defineProperty(globalThis.navigator, 'mediaDevices', {
-    value: { getUserMedia, enumerateDevices },
+    value: { getUserMedia, enumerateDevices, addEventListener: vi.fn(), removeEventListener: vi.fn() },
     writable: true,
     configurable: true,
   });
@@ -80,6 +85,42 @@ describe('useCamera', () => {
 
     expect(result.current.state).toBe('idle');
     expect(result.current.stream).toBeNull();
+  });
+
+  it('selectDevice switches to a specific camera', async () => {
+    const { getUserMedia } = setupMediaDevices();
+    const { result } = renderHook(() => useCamera());
+
+    await act(async () => {
+      await result.current.start();
+    });
+
+    await act(async () => {
+      await result.current.selectDevice('cam-2');
+    });
+
+    expect(getUserMedia).toHaveBeenCalledWith(
+      expect.objectContaining({
+        video: expect.objectContaining({
+          deviceId: { exact: 'cam-2' },
+        }),
+      }),
+    );
+  });
+
+  it('exposes getCapabilities and getSettings', async () => {
+    setupMediaDevices();
+    const { result } = renderHook(() => useCamera());
+
+    await act(async () => {
+      await result.current.start();
+    });
+
+    const capabilities = result.current.getCapabilities();
+    const settings = result.current.getSettings();
+
+    expect(capabilities).toEqual({});
+    expect(settings).toEqual({});
   });
 
   it('cleans up on unmount', async () => {

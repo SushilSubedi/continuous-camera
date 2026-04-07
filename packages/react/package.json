@@ -30,7 +30,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@continuous-camera/core": "0.1.0"
+    "@continuous-camera/core": "workspace:*"
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.2",

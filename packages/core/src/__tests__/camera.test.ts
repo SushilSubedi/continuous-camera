@@ -11,6 +11,11 @@ function createMockTrack(kind: 'video' | 'audio' = 'video'): MediaStreamTrack {
     enabled: true,
     id: crypto.randomUUID(),
     label: `Mock ${kind} track`,
+    applyConstraints: vi.fn().mockResolvedValue(undefined),
+    getCapabilities: vi.fn().mockReturnValue({}),
+    getSettings: vi.fn().mockReturnValue({}),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
   } as unknown as MediaStreamTrack;
 }
 
@@ -41,6 +46,8 @@ function setupMediaDevices(stream?: MediaStream) {
       mediaDevices: {
         getUserMedia: mockGetUserMedia,
         enumerateDevices: mockEnumerateDevices,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
       },
     },
     writable: true,
@@ -205,6 +212,151 @@ describe('Camera', () => {
       expect(camera.stream).toBeNull();
       // Listener cleared, so further changes won't fire
       handler.mockClear();
+    });
+  });
+
+  describe('selectDevice()', () => {
+    it('sets deviceId, stops active stream, and starts a new one with exact deviceId constraint', async () => {
+      const { mockGetUserMedia } = setupMediaDevices();
+      const camera = new Camera({ facingMode: 'user' });
+      await camera.start();
+
+      await camera.selectDevice('cam-2');
+
+      expect(mockGetUserMedia).toHaveBeenCalledTimes(2);
+      const lastCall = mockGetUserMedia.mock.calls[1][0];
+      expect(lastCall.video.deviceId).toEqual({ exact: 'cam-2' });
+    });
+  });
+
+  describe('applyConstraints()', () => {
+    it('applies constraints to the active video track', async () => {
+      const { mockStream } = setupMediaDevices();
+      const camera = new Camera();
+      await camera.start();
+
+      const constraints: MediaTrackConstraints = { width: 1280, height: 720 };
+      await camera.applyConstraints(constraints);
+
+      const videoTrack = mockStream.getVideoTracks()[0];
+      expect(videoTrack.applyConstraints).toHaveBeenCalledWith(constraints);
+    });
+
+    it('throws if camera is not active', async () => {
+      setupMediaDevices();
+      const camera = new Camera();
+      await expect(camera.applyConstraints({ width: 1280 })).rejects.toThrow(
+        'Camera is not active',
+      );
+    });
+  });
+
+  describe('getCapabilities()', () => {
+    it('returns capabilities from the active video track', async () => {
+      const track = createMockTrack('video');
+      const capabilities = { width: { min: 320, max: 1920 } };
+      (track.getCapabilities as ReturnType<typeof vi.fn>).mockReturnValue(capabilities);
+
+      const stream = createMockStream([track]);
+      setupMediaDevices(stream);
+
+      const camera = new Camera();
+      await camera.start();
+
+      expect(camera.getCapabilities()).toEqual(capabilities);
+    });
+
+    it('returns null when camera is not active', () => {
+      const camera = new Camera();
+      expect(camera.getCapabilities()).toBeNull();
+    });
+  });
+
+  describe('getSettings()', () => {
+    it('returns settings from the active video track', async () => {
+      const track = createMockTrack('video');
+      const settings = { width: 1920, height: 1080, frameRate: 30 };
+      (track.getSettings as ReturnType<typeof vi.fn>).mockReturnValue(settings);
+
+      const stream = createMockStream([track]);
+      setupMediaDevices(stream);
+
+      const camera = new Camera();
+      await camera.start();
+
+      expect(camera.getSettings()).toEqual(settings);
+    });
+
+    it('returns null when camera is not active', () => {
+      const camera = new Camera();
+      expect(camera.getSettings()).toBeNull();
+    });
+  });
+
+  describe('trackended event', () => {
+    it('emits trackended when the video track fires ended', async () => {
+      const track = createMockTrack('video');
+      const stream = createMockStream([track]);
+      setupMediaDevices(stream);
+
+      const camera = new Camera();
+      await camera.start();
+
+      const handler = vi.fn();
+      camera.on('trackended', handler);
+
+      // Retrieve the ended listener registered via addEventListener
+      const addEventListenerCalls = (track.addEventListener as ReturnType<typeof vi.fn>).mock.calls;
+      const endedCall = addEventListenerCalls.find((call) => call[0] === 'ended');
+      expect(endedCall).toBeDefined();
+
+      // Simulate the track ending
+      endedCall![1]();
+
+      expect(handler).toHaveBeenCalled();
+    });
+  });
+
+  describe('devicechange event', () => {
+    it('emits devicechange with devices when navigator.mediaDevices fires devicechange', async () => {
+      setupMediaDevices();
+      const camera = new Camera();
+      await camera.start();
+
+      const handler = vi.fn();
+      camera.on('devicechange', handler);
+
+      // Find the devicechange listener registered on navigator.mediaDevices
+      const addEventListenerCalls = (
+        navigator.mediaDevices.addEventListener as ReturnType<typeof vi.fn>
+      ).mock.calls;
+      const deviceChangeCall = addEventListenerCalls.find((call) => call[0] === 'devicechange');
+      expect(deviceChangeCall).toBeDefined();
+
+      // Simulate the devicechange event
+      await deviceChangeCall![1]();
+
+      expect(handler).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ kind: 'videoinput' }),
+        ]),
+      );
+    });
+  });
+
+  describe('switchCamera() clears deviceId', () => {
+    it('uses facingMode instead of deviceId after switchCamera', async () => {
+      const { mockGetUserMedia } = setupMediaDevices();
+      const camera = new Camera({ facingMode: 'user' });
+      await camera.start();
+
+      await camera.selectDevice('cam-2');
+      expect(mockGetUserMedia.mock.calls[1][0].video.deviceId).toEqual({ exact: 'cam-2' });
+
+      await camera.switchCamera();
+      const lastCall = mockGetUserMedia.mock.calls[2][0];
+      expect(lastCall.video.facingMode).toBeDefined();
+      expect(lastCall.video.deviceId).toBeUndefined();
     });
   });
 });
