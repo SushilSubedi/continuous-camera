@@ -4,12 +4,19 @@ import type { CameraState } from '../types';
 
 // -- Mock MediaStream & navigator.mediaDevices --
 
+let mockId = 0;
+
+function nextMockId(prefix: string): string {
+  mockId += 1;
+  return `${prefix}-${mockId}`;
+}
+
 function createMockTrack(kind: 'video' | 'audio' = 'video'): MediaStreamTrack {
   return {
     kind,
     stop: vi.fn(),
     enabled: true,
-    id: crypto.randomUUID(),
+    id: nextMockId(`${kind}-track`),
     label: `Mock ${kind} track`,
     applyConstraints: vi.fn().mockResolvedValue(undefined),
     getCapabilities: vi.fn().mockReturnValue({}),
@@ -25,7 +32,7 @@ function createMockStream(tracks?: MediaStreamTrack[]): MediaStream {
     getTracks: () => _tracks,
     getVideoTracks: () => _tracks.filter((t) => t.kind === 'video'),
     getAudioTracks: () => _tracks.filter((t) => t.kind === 'audio'),
-    id: crypto.randomUUID(),
+    id: nextMockId('stream'),
     active: true,
   } as unknown as MediaStream;
 }
@@ -65,6 +72,10 @@ function cleanupMediaDevices() {
 // -- Tests --
 
 describe('Camera', () => {
+  beforeEach(() => {
+    mockId = 0;
+  });
+
   afterEach(() => {
     cleanupMediaDevices();
   });
