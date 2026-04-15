@@ -34,7 +34,26 @@ jobs:
       - name: Test
         run: pnpm test
 
-      - name: Publish packages
-        run: pnpm -r publish --no-git-checks --access public
+      - name: Publish @continuous-camera/core
+        run: |
+          LOCAL=$(node -p "require('./packages/core/package.json').version")
+          REMOTE=$(npm view @continuous-camera/core version 2>/dev/null || echo "0.0.0")
+          if [ "$LOCAL" != "$REMOTE" ]; then
+            pnpm --filter @continuous-camera/core publish --no-git-checks --access public
+          else
+            echo "core@$LOCAL already published, skipping"
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish @continuous-camera/react
+        run: |
+          LOCAL=$(node -p "require('./packages/react/package.json').version")
+          REMOTE=$(npm view @continuous-camera/react version 2>/dev/null || echo "0.0.0")
+          if [ "$LOCAL" != "$REMOTE" ]; then
+            pnpm --filter @continuous-camera/react publish --no-git-checks --access public
+          else
+            echo "react@$LOCAL already published, skipping"
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
