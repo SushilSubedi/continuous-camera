@@ -20,8 +20,8 @@ A lightweight, framework-agnostic camera library with first-class React support.
 
 | Package | Version | Description |
 |---|---|---|
-| [`@continuous-camera/core`](./packages/core) | 0.1.0 | Framework-agnostic camera API |
-| [`@continuous-camera/react`](./packages/react) | 0.1.0 | React hooks & components |
+| [`@continuous-camera/core`](./packages/core) | 0.2.0 | Framework-agnostic camera API |
+| [`@continuous-camera/react`](./packages/react) | 0.2.0 | React hooks & components |
 
 ## Installation
 
