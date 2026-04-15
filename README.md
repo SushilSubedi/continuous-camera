@@ -1,6 +1,6 @@
 # Continuous Camera
 
-[![CI](https://github.com/SushilSubedi/continuous-camera/actions/workflows/ci.yml/badge.svg)](https://github.com/SushilSubedi/continuous-camera/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@continuous-camera/core)](https://www.npmjs.com/package/@continuous-camera/core)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 A lightweight, framework-agnostic camera library with first-class React support. Access device cameras, capture photos, switch cameras — works with Next.js, Astro, Remix, and vanilla JavaScript.
@@ -237,17 +237,6 @@ cd examples/nextjs-demo
 npm install
 npm run dev
 ```
-
-## Roadmap
-
-Near-term improvements focused on production use cases and customer customization:
-
-- ✅ Device selection by `deviceId`, not just front/back switching
-- ✅ Runtime camera updates with `applyConstraints()` and richer track controls
-- ✅ Access to camera capabilities and active settings for adaptive UIs
-- ✅ Richer capture controls such as crop, resize, mirror, and rotate
-- ✅ Lower-level preview hooks and overlay-friendly React primitives
-- ✅ Better lifecycle events for permission changes, device changes, and track endings
 
 ## Development
 
