@@ -29,6 +29,8 @@ export interface CameraOptions {
   audio?: boolean;
   /** Raw MediaStreamConstraints override (takes precedence over other options) */
   constraints?: MediaStreamConstraints;
+  /** Maximum queued plus in-flight captures before `capture()` rejects. Default: 10 */
+  maxPendingCaptures?: number;
 }
 
 export interface CaptureOptions {
@@ -46,6 +48,27 @@ export interface CaptureOptions {
   rotate?: 0 | 90 | 180 | 270;
 }
 
+export interface CaptureBurstOptions extends CaptureOptions {
+  /** Number of photos to take. Default: unlimited until `stopBurst()`, `signal`, or `stop()` */
+  count?: number;
+  /** Minimum milliseconds between the start of consecutive shots. Default: 0 (back to back) */
+  interval?: number;
+  /** Ends the burst after the in-flight shot; the photos taken so far are returned */
+  signal?: AbortSignal;
+}
+
+export interface CapturedPhoto {
+  blob: Blob;
+  /** Milliseconds from the start of the shot until its Blob was encoded */
+  durationMs: number;
+}
+
+export interface CaptureQueueState {
+  /** Queued plus in-flight shots */
+  pending: number;
+  bursting: boolean;
+}
+
 export interface CameraEventMap {
   statechange: CameraState;
   error: Error;
@@ -55,6 +78,10 @@ export interface CameraEventMap {
   devicechange: MediaDeviceInfo[];
   /** Fired when the active video track ends unexpectedly */
   trackended: void;
+  /** Fired with every photo from `capture()` and `captureBurst()` as soon as it is encoded */
+  capture: CapturedPhoto;
+  /** Fired when the number of pending shots or the burst state changes */
+  capturechange: CaptureQueueState;
 }
 
 export type CameraEventHandler<T> = (data: T) => void;
