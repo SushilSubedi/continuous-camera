@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "Continuous Camera Demo",
+    "slug": "continuous-camera-demo",
+    "version": "0.1.0",
+    "scheme": "continuous-camera-demo",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "experiments": { "autolinkingModuleResolution": true },
+    "ios": {
+      "bundleIdentifier": "com.continuouscamera.demo",
+      "supportsTablet": true,
+      "infoPlist": { "NSCameraUsageDescription": "Use the camera to try Fast and HD photo capture in this demo." }
+    },
+    "android": {
+      "package": "com.continuouscamera.demo",
+      "permissions": ["android.permission.CAMERA"],
+      "blockedPermissions": ["android.permission.RECORD_AUDIO"]
+    },
+    "plugins": ["expo-dev-client"]
+  }
+}
