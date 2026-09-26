@@ -2,6 +2,24 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useCamera } from '../use-camera';
 
+function setupCapture() {
+  const grabFrame = vi.fn(() => Promise.resolve({ width: 640, height: 480, close: vi.fn() }));
+  let encoded = 0;
+  vi.stubGlobal('ImageCapture', class { grabFrame = grabFrame; });
+  vi.stubGlobal('OffscreenCanvas', class {
+    getContext = () => ({ save: vi.fn(), restore: vi.fn(), translate: vi.fn(), rotate: vi.fn(), scale: vi.fn(), drawImage: vi.fn() });
+    convertToBlob = () => Promise.resolve(new Blob([`photo-${encoded++}`]));
+  });
+  function hold() {
+    let release!: () => void;
+    grabFrame.mockImplementationOnce(() => new Promise((done) => {
+      release = () => done({ width: 640, height: 480, close: vi.fn() });
+    }));
+    return () => release();
+  }
+  return { grabFrame, hold };
+}
+
 function createMockTrack(): MediaStreamTrack {
   return {
     kind: 'video',
@@ -47,6 +65,7 @@ function setupMediaDevices() {
 describe('useCamera', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it('initializes with idle state', () => {
@@ -136,5 +155,82 @@ describe('useCamera', () => {
     mockStream.getTracks().forEach((track) => {
       expect(track.stop).toHaveBeenCalled();
     });
+  });
+
+  it('tracks queued shots and delivers each photo to onCapture', async () => {
+    setupMediaDevices();
+    const { hold } = setupCapture();
+    const onCapture = vi.fn();
+    const { result } = renderHook(() => useCamera({ onCapture }));
+    await act(async () => { await result.current.start(); });
+    expect(result.current.canCapture).toBe(true);
+
+    const release = hold();
+    let shots!: Promise<Blob[]>;
+    await act(async () => {
+      shots = Promise.all([result.current.capture(), result.current.capture()]);
+    });
+    expect(result.current.pendingCaptures).toBe(2);
+    expect(result.current.isCapturing).toBe(true);
+
+    await act(async () => {
+      release();
+      await shots;
+    });
+    expect(result.current.pendingCaptures).toBe(0);
+    expect(result.current.isCapturing).toBe(false);
+    expect(onCapture).toHaveBeenCalledTimes(2);
+    expect(await onCapture.mock.calls[0][0].blob.text()).toBe('photo-0');
+  });
+
+  it('uses the latest onCapture without rebuilding the camera', async () => {
+    const { getUserMedia } = setupMediaDevices();
+    setupCapture();
+    const first = vi.fn();
+    const second = vi.fn();
+    const { result, rerender } = renderHook(({ onCapture }) => useCamera({ onCapture }), {
+      initialProps: { onCapture: first },
+    });
+    await act(async () => { await result.current.start(); });
+    rerender({ onCapture: second });
+    await act(async () => { await result.current.capture(); });
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledOnce();
+    expect(result.current.isActive).toBe(true);
+    expect(getUserMedia).toHaveBeenCalledOnce();
+  });
+
+  it('runs a burst and reports isBursting until stopBurst', async () => {
+    setupMediaDevices();
+    setupCapture();
+    const onCapture = vi.fn();
+    const { result } = renderHook(() => useCamera({ onCapture }));
+    await act(async () => { await result.current.start(); });
+
+    await act(async () => {
+      expect(await result.current.captureBurst({ count: 3 })).toHaveLength(3);
+    });
+    expect(onCapture).toHaveBeenCalledTimes(3);
+
+    onCapture.mockImplementation(() => {
+      if (onCapture.mock.calls.length === 5) result.current.stopBurst();
+    });
+    let burst!: Promise<Blob[]>;
+    act(() => { burst = result.current.captureBurst(); });
+    expect(result.current.isBursting).toBe(true);
+    await act(async () => { await burst; });
+    expect(await burst).toHaveLength(2);
+    expect(result.current.isBursting).toBe(false);
+  });
+
+  it('disallows capture while inactive or when the queue is full', async () => {
+    setupMediaDevices();
+    const { hold } = setupCapture();
+    const { result } = renderHook(() => useCamera({ maxPendingCaptures: 1 }));
+    expect(result.current.canCapture).toBe(false);
+    await act(async () => { await result.current.start(); });
+    hold();
+    await act(async () => { void result.current.capture(); });
+    expect(result.current.canCapture).toBe(false);
   });
 });

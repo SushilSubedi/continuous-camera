@@ -1,5 +1,6 @@
 export { useCamera } from './use-camera';
-export type { UseCameraReturn } from './use-camera';
+export type { UseCameraOptions, UseCameraReturn } from './use-camera';
+export { CaptureBurstError } from '@continuous-camera/core';
 export { CameraPreview, useCameraPreview } from './camera-preview';
 export type { CameraPreviewProps } from './camera-preview';
 
@@ -9,6 +10,8 @@ export type {
   CameraState,
   CameraFacingMode,
   CaptureOptions,
+  CaptureBurstOptions,
+  CapturedPhoto,
   CropRegion,
   Resolution,
 } from '@continuous-camera/core';

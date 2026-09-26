@@ -1,12 +1,20 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef, type ChangeEvent } from "react";
-import { useCamera, CameraPreview } from "@continuous-camera/react";
+import { useState, useCallback, useEffect, useMemo, useRef, type ChangeEvent } from "react";
+import { useCamera, CameraPreview, type CapturedPhoto } from "@continuous-camera/react";
 
 const TRACK_PRESETS = [
   { label: "HD", width: 1280, height: 720 },
   { label: "Full HD", width: 1920, height: 1080 },
 ] as const;
+
+/** Hold-to-shoot can produce hundreds of frames; older ones are released beyond this. */
+const MAX_GALLERY = 48;
+
+interface GalleryPhoto {
+  url: string;
+  durationMs: number;
+}
 
 function getCenteredSquareCrop(settings: MediaTrackSettings | null) {
   if (!settings?.width || !settings.height) {
@@ -31,9 +39,25 @@ function formatRange(range?: MediaSettingsRange) {
 }
 
 export function CameraDemo() {
+  const [captures, setCaptures] = useState<GalleryPhoto[]>([]);
+  const capturesRef = useRef<GalleryPhoto[]>([]);
+
+  // Every shot (tap, burst or hold) lands here as soon as it is encoded.
+  const addPhoto = useCallback(({ blob, durationMs }: CapturedPhoto) => {
+    const next = [{ url: URL.createObjectURL(blob), durationMs }, ...capturesRef.current];
+    next.splice(MAX_GALLERY).forEach((photo) => URL.revokeObjectURL(photo.url));
+    capturesRef.current = next;
+    setCaptures(next);
+  }, []);
+
   const {
     camera,
     capture,
+    captureBurst,
+    stopBurst,
+    pendingCaptures,
+    isBursting,
+    canCapture,
     error,
     getCapabilities,
     getDevices,
@@ -46,10 +70,8 @@ export function CameraDemo() {
     stream,
     switchCamera,
     applyConstraints,
-  } = useCamera({ facingMode: "user" });
-  const [captures, setCaptures] = useState<string[]>([]);
+  } = useCamera({ facingMode: "user", onCapture: addPhoto });
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
-  const capturesRef = useRef<string[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState("");
   const [mirror, setMirror] = useState(false);
   const [rotate, setRotate] = useState<0 | 90 | 180 | 270>(0);
@@ -75,12 +97,8 @@ export function CameraDemo() {
   );
 
   useEffect(() => {
-    capturesRef.current = captures;
-  }, [captures]);
-
-  useEffect(() => {
     return () => {
-      capturesRef.current.forEach((url) => URL.revokeObjectURL(url));
+      capturesRef.current.forEach((photo) => URL.revokeObjectURL(photo.url));
     };
   }, []);
 
@@ -152,7 +170,7 @@ export function CameraDemo() {
   }, [stop]);
 
   const clearCaptures = useCallback(() => {
-    capturesRef.current.forEach((url) => URL.revokeObjectURL(url));
+    capturesRef.current.forEach((photo) => URL.revokeObjectURL(photo.url));
     capturesRef.current = [];
     setCaptures([]);
   }, []);
@@ -194,31 +212,36 @@ export function CameraDemo() {
     [refreshTrackInfo, selectDevice],
   );
 
-  const handleCapture = useCallback(async () => {
-    const crop = captureMode === "square" ? getCenteredSquareCrop(settings) : undefined;
+  const captureOptions = useMemo(
+    () => ({
+      format: "image/jpeg" as const,
+      quality: 0.9,
+      crop: captureMode === "square" ? getCenteredSquareCrop(settings) : undefined,
+      resize: captureMode === "square" ? { width: 1080, height: 1080 } : undefined,
+      mirror: mirror || undefined,
+      rotate: rotate || undefined,
+    }),
+    [captureMode, mirror, rotate, settings],
+  );
 
-    try {
-      const blob = await capture({
-        format: "image/jpeg",
-        quality: 0.9,
-        crop,
-        resize:
-          captureMode === "square"
-            ? {
-                width: 1080,
-                height: 1080,
-              }
-            : undefined,
-        mirror: mirror || undefined,
-        rotate: rotate || undefined,
-      });
-      const url = URL.createObjectURL(blob);
-      setCaptures((prev) => [url, ...prev]);
-    } catch (err) {
-      console.error("Capture failed:", err);
-      setNotice(err instanceof Error ? err.message : "Capture failed.");
-    }
-  }, [capture, captureMode, mirror, rotate, settings]);
+  const reportCaptureError = useCallback((err: unknown) => {
+    console.error("Capture failed:", err);
+    setNotice(err instanceof Error ? err.message : "Capture failed.");
+  }, []);
+
+  // Tapping faster than frames encode queues shots rather than dropping them.
+  const handleCapture = useCallback(() => {
+    capture(captureOptions).catch(reportCaptureError);
+  }, [capture, captureOptions, reportCaptureError]);
+
+  const handleBurst = useCallback(
+    (count?: number) => {
+      captureBurst({ ...captureOptions, count })
+        .then((photos) => setNotice(`Burst captured ${photos.length} photo${photos.length === 1 ? "" : "s"}.`))
+        .catch(reportCaptureError);
+    },
+    [captureBurst, captureOptions, reportCaptureError],
+  );
 
   const cycleRotation = useCallback(() => {
     setRotate((prev) => (((prev + 90) % 360) as 0 | 90 | 180 | 270));
@@ -323,10 +346,38 @@ export function CameraDemo() {
           ) : (
             <>
               <button
-                onClick={() => void handleCapture()}
-                className="rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-black transition hover:bg-neutral-200"
+                onClick={handleCapture}
+                disabled={!canCapture}
+                className="rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-black transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Capture still
+              </button>
+              <button
+                onClick={() => handleBurst(5)}
+                disabled={isBursting || !canCapture}
+                className="rounded-full border border-white/15 bg-white/5 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Burst 5
+              </button>
+              <button
+                onPointerDown={(event) => {
+                  // Keeps pointerup on this button even if the pointer drifts off it.
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                  handleBurst();
+                }}
+                onPointerUp={stopBurst}
+                onPointerCancel={stopBurst}
+                onKeyDown={(event) => {
+                  if ((event.key === " " || event.key === "Enter") && !event.repeat) handleBurst();
+                }}
+                onKeyUp={stopBurst}
+                onBlur={stopBurst}
+                disabled={!isBursting && !canCapture}
+                className={`touch-none select-none rounded-full px-5 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                  isBursting ? "bg-blue-500 text-white" : "border border-white/15 bg-white/5 text-white hover:bg-white/10"
+                }`}
+              >
+                {isBursting ? "Shooting…" : "Hold to shoot"}
               </button>
               <button
                 onClick={() => void handleSwitchCamera()}
@@ -343,6 +394,10 @@ export function CameraDemo() {
             </>
           )}
         </div>
+
+        {pendingCaptures > 1 ? (
+          <p className="text-xs text-white/55">{pendingCaptures} shots queued</p>
+        ) : null}
       </section>
 
       <section className="space-y-4 rounded-[2rem] border border-white/10 bg-white/5 p-4 shadow-[0_20px_60px_rgba(0,0,0,0.25)] backdrop-blur-sm">
@@ -478,14 +533,16 @@ export function CameraDemo() {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {captures.map((url, index) => (
-              <figure key={url} className="space-y-2 rounded-[1.5rem] border border-white/10 bg-black/25 p-3">
+            {captures.map((photo, index) => (
+              <figure key={photo.url} className="space-y-2 rounded-[1.5rem] border border-white/10 bg-black/25 p-3">
                 <img
-                  src={url}
+                  src={photo.url}
                   alt={`Capture ${index + 1}`}
                   className="aspect-square w-full rounded-[1.25rem] object-cover"
                 />
-                <figcaption className="text-xs text-white/55">Capture {index + 1}</figcaption>
+                <figcaption className="text-xs text-white/55">
+                  Capture {index + 1} · {photo.durationMs} ms
+                </figcaption>
               </figure>
             ))}
           </div>

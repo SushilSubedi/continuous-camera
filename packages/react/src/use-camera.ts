@@ -1,6 +1,17 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Camera } from '@continuous-camera/core';
-import type { CameraOptions, CameraState, CaptureOptions } from '@continuous-camera/core';
+import type {
+  CameraOptions,
+  CameraState,
+  CaptureBurstOptions,
+  CapturedPhoto,
+  CaptureOptions,
+} from '@continuous-camera/core';
+
+export interface UseCameraOptions extends CameraOptions {
+  /** Called with every photo from `capture()` and `captureBurst()` as soon as it is encoded */
+  onCapture?: (photo: CapturedPhoto) => void;
+}
 
 export interface UseCameraReturn {
   /** Current camera state */
@@ -25,37 +36,65 @@ export interface UseCameraReturn {
   getCapabilities: () => MediaTrackCapabilities | null;
   /** Get current settings of the active video track */
   getSettings: () => MediaTrackSettings | null;
-  /** Capture a still frame as a Blob */
+  /** Queue a shot of the active stream; shots run one at a time in order */
   capture: (options?: CaptureOptions) => Promise<Blob>;
+  /** Capture repeatedly until `count`, `stopBurst()`, `signal`, or the camera stops */
+  captureBurst: (options?: CaptureBurstOptions) => Promise<Blob[]>;
+  /** End a running burst after its in-flight shot */
+  stopBurst: () => void;
+  /** Queued plus in-flight shots */
+  pendingCaptures: number;
+  /** Whether any shot is queued or in flight */
+  isCapturing: boolean;
+  /** Whether a burst is running */
+  isBursting: boolean;
+  /** Whether the camera is active and the capture queue has room */
+  canCapture: boolean;
   /** List available video input devices */
   getDevices: () => Promise<MediaDeviceInfo[]>;
   /** The underlying Camera instance */
   camera: Camera;
 }
 
-export function useCamera(options: CameraOptions = {}): UseCameraReturn {
+export function useCamera(options: UseCameraOptions = {}): UseCameraReturn {
+  const { onCapture, ...cameraOptions } = options;
   const cameraRef = useRef<Camera | null>(null);
   const [state, setState] = useState<CameraState>('idle');
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<Error | null>(null);
+  const [pendingCaptures, setPendingCaptures] = useState(0);
+  const [isBursting, setIsBursting] = useState(false);
+
+  // An inline onCapture must not rebuild the camera, so it is read through a ref.
+  const onCaptureRef = useRef(onCapture);
+  onCaptureRef.current = onCapture;
 
   // Initialize camera once, rebuild if options change via key serialization
-  const optionsKey = JSON.stringify(options);
+  const optionsKey = JSON.stringify(cameraOptions);
 
   useEffect(() => {
-    const cam = new Camera(options);
+    const cam = new Camera(cameraOptions);
     cameraRef.current = cam;
+    setPendingCaptures(0);
+    setIsBursting(false);
 
     const unsubState = cam.on('statechange', setState);
     const unsubError = cam.on('error', setError);
     const unsubStart = cam.on('streamstart', setStream);
     const unsubStop = cam.on('streamstop', () => setStream(null));
+    const unsubCapture = cam.on('capture', (photo) => onCaptureRef.current?.(photo));
+    const unsubCaptureChange = cam.on('capturechange', ({ pending, bursting }) => {
+      setPendingCaptures(pending);
+      setIsBursting(bursting);
+    });
 
     return () => {
       unsubState();
       unsubError();
       unsubStart();
       unsubStop();
+      unsubCapture();
+      unsubCaptureChange();
       cam.destroy();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -98,6 +137,15 @@ export function useCamera(options: CameraOptions = {}): UseCameraReturn {
     return cameraRef.current.capture(captureOptions);
   }, []);
 
+  const captureBurst = useCallback(async (burstOptions?: CaptureBurstOptions) => {
+    if (!cameraRef.current) throw new Error('Camera not initialized');
+    return cameraRef.current.captureBurst(burstOptions);
+  }, []);
+
+  const stopBurst = useCallback(() => {
+    cameraRef.current?.stopBurst();
+  }, []);
+
   const getDevices = useCallback(async () => {
     if (!cameraRef.current) return [];
     return cameraRef.current.getDevices();
@@ -116,6 +164,12 @@ export function useCamera(options: CameraOptions = {}): UseCameraReturn {
     getCapabilities,
     getSettings,
     capture,
+    captureBurst,
+    stopBurst,
+    pendingCaptures,
+    isCapturing: pendingCaptures > 0,
+    isBursting,
+    canCapture: state === 'active' && pendingCaptures < (cameraOptions.maxPendingCaptures ?? 10),
     getDevices,
     camera: cameraRef.current!,
   };
