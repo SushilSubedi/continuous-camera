@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [react-native 0.1.0] - 2026-09-27
+
 ### Added
 
-- `@continuous-camera/react-native` (not yet published): React Native hooks and preview on VisionCamera 5 with the same rapid-capture API, plus the `examples/expo-demo` camera app
+- `@continuous-camera/react-native` 0.1.0: React Native hooks and preview on VisionCamera 5 with the same rapid-capture API (queued `capture()`, `captureBurst()` / `stopBurst()`, `onCapture`), Android Fast (preview snapshot) and HD (photo) modes, plus the `examples/expo-demo` camera app
 
 ## [0.3.0] - 2026-09-27
 

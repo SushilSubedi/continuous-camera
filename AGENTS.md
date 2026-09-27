@@ -65,7 +65,7 @@ pnpm --filter @continuous-camera/react build
 
 ## Publishing
 
-Packages are scoped under `@continuous-camera/` and published to npm with `"access": "public"`. Current version: `0.3.0` (`react-native` is unreleased).
+Packages are scoped under `@continuous-camera/` and published to npm with `"access": "public"`. Current versions: `core` and `react` `0.3.0`, `react-native` `0.1.0`.
 
 ## Important Patterns
 
