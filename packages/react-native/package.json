@@ -55,6 +55,20 @@
   "publishConfig": {
     "access": "public"
   },
+  "homepage": "https://github.com/SushilSubedi/continuous-camera/tree/main/packages/react-native",
+  "bugs": {
+    "url": "https://github.com/SushilSubedi/continuous-camera/issues"
+  },
+  "author": "Sushil Subedi",
+  "keywords": [
+    "camera",
+    "react-native",
+    "vision-camera",
+    "expo",
+    "burst",
+    "capture",
+    "photo"
+  ],
   "license": "MIT",
   "sideEffects": false
 }

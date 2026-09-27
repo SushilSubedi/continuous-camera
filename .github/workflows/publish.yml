@@ -58,3 +58,15 @@ jobs:
           fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish @continuous-camera/react-native
+        run: |
+          LOCAL=$(node -p "require('./packages/react-native/package.json').version")
+          REMOTE=$(npm view @continuous-camera/react-native version 2>/dev/null || echo "0.0.0")
+          if [ "$LOCAL" != "$REMOTE" ]; then
+            pnpm --filter @continuous-camera/react-native publish --no-git-checks --access public
+          else
+            echo "react-native@$LOCAL already published, skipping"
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

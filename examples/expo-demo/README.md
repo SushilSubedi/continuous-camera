@@ -52,7 +52,7 @@ Photos stay in the app's cache (`continuous-camera-demo/`), are never uploaded, 
 - `src/photo-gallery.tsx`: gallery grid and photo review.
 - `app.json`: camera permission and separate Android/iOS identifiers.
 
-The workspace dependency uses the local library directly, so library edits are visible in Metro. To move this example into another repository before npm publication, build and pack `packages/react-native`, replace `workspace:*` with a `file:` tarball dependency, and install it there. Once published, use the released package version.
+The workspace dependency uses the local library directly, so library edits are visible in Metro. To use this example in another repository, replace `workspace:*` with the published version, for example `^0.1.0`.
 
 Expo's [monorepo support](https://docs.expo.dev/guides/monorepos/) supplies Metro configuration. SDK 54's autolinking module resolution is enabled to keep JavaScript and native module resolution aligned. Camera permission setup follows [VisionCamera's installation guide](https://visioncamera.margelo.com/docs).
 

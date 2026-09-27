@@ -61,7 +61,7 @@ export function MobileShowcase() {
           >
             Package docs
           </a>
-          <span className="text-xs text-white/40">Preview release · not yet on npm</span>
+          <code className="text-xs text-white/50">npm i @continuous-camera/react-native</code>
         </div>
       </div>
 

@@ -23,7 +23,7 @@ A lightweight, framework-agnostic camera library with first-class React support.
 |---|---|---|
 | [`@continuous-camera/core`](./packages/core) | 0.3.0 | Framework-agnostic camera API |
 | [`@continuous-camera/react`](./packages/react) | 0.3.0 | React hooks & components |
-| [`@continuous-camera/react-native`](./packages/react-native) | Unreleased | Native camera hooks & preview using VisionCamera 5 |
+| [`@continuous-camera/react-native`](./packages/react-native) | 0.1.0 | Native camera hooks & preview using VisionCamera 5 |
 
 React Native support is available as an initial workspace package. See the [native setup and usage guide](./packages/react-native/README.md) for integration; the browser packages remain independent.
 

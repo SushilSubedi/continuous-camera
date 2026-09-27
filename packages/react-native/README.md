@@ -2,21 +2,14 @@
 
 React Native camera support for Continuous Camera, built on VisionCamera 5. This package lives in the Continuous Camera monorepo and is independent of the browser packages.
 
-Status: unreleased. Verified on an Android 16 emulator (capture, queue, bursts, hold-to-shoot, lifecycle) and on the iOS Simulator (launch and permissions only; it has no camera). Not yet verified on physical devices. Developed against React Native 0.81.5, React 19.1, and VisionCamera 5.0.11. VisionCamera 4 is not supported.
+Status: early release (0.1.x). Verified on an Android 16 emulator (capture, queue, bursts, hold-to-shoot, lifecycle) and on the iOS Simulator (launch and permissions only; it has no camera). Not yet verified on physical devices. Developed against React Native 0.81.5, React 19.1, and VisionCamera 5.0.11. VisionCamera 4 is not supported.
 
 Try the [standalone Expo demo](../../examples/expo-demo) for a complete app using this package.
 
 ## Setup
 
-Until published, build and pack this workspace package and install the resulting tarball in your app:
-
 ```sh
-pnpm --filter @continuous-camera/react-native build
-cd packages/react-native
-pnpm pack
-# In your React Native app:
-npm install /absolute/path/to/continuous-camera-react-native-0.1.0.tgz
-npm install react-native-vision-camera@^5.0.11 react-native-nitro-modules react-native-nitro-image
+npm install @continuous-camera/react-native react-native-vision-camera@^5.0.11 react-native-nitro-modules react-native-nitro-image
 ```
 
 Follow [VisionCamera's native setup instructions](https://github.com/mrousavy/react-native-vision-camera/blob/main/docs/content/docs/index.mdx) for compatible native dependencies, camera permission declarations, and rebuilding the app. For Expo, use a development build containing the native modules; Expo Go does not include them. Camera features must be validated on physical Android and iOS devices.
