@@ -253,106 +253,50 @@ export function CameraDemo() {
     (device) => device.deviceId === selectedDeviceId,
   )?.label;
 
-  const captureSummary = [
-    captureMode === "square" ? "square crop" : "full frame",
-    mirror ? "mirrored file" : null,
-    rotate ? `${rotate}deg rotation` : null,
+  const statusLine = [
+    selectedDeviceLabel || (isActive ? "Default camera" : null),
+    settings?.width && settings.height ? `${settings.width}×${settings.height}` : null,
+    pendingCaptures > 1 ? `${pendingCaptures} photos queued` : null,
   ]
     .filter(Boolean)
-    .join(" • ");
+    .join(" · ");
 
   return (
-    <div className="grid w-full gap-6 lg:grid-cols-[minmax(0,1.65fr)_minmax(18rem,0.85fr)]">
-      <section className="space-y-4 rounded-[2rem] border border-white/10 bg-black/45 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur">
-        <div className="relative aspect-video overflow-hidden rounded-[1.5rem] border border-white/10 bg-neutral-950">
+    <div className="space-y-8">
+      <section className={card}>
+        <div className="relative aspect-video bg-neutral-900">
           {isActive ? (
             <CameraPreview stream={stream} mirror={previewMirror} className="h-full w-full">
-              <div className="flex h-full flex-col justify-between bg-gradient-to-b from-black/45 via-transparent to-black/55 p-4 text-white">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-2">
-                    <span className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] uppercase tracking-[0.28em] text-white/75">
-                      Live preview
-                    </span>
-                    <p className="max-w-xs text-sm text-white/70">
-                      Device selection, overlay support, runtime constraints, and transformed still capture.
-                    </p>
-                  </div>
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-medium ${
-                      isActive
-                        ? "bg-emerald-500/15 text-emerald-200"
-                        : state === "error"
-                          ? "bg-red-500/20 text-red-200"
-                          : "bg-white/10 text-white/65"
-                    }`}
-                  >
-                    {state}
-                  </span>
+              {captureMode === "square" ? (
+                <div className="pointer-events-none flex h-full items-center justify-center">
+                  <div className="aspect-square h-full border-x border-white/60" />
                 </div>
-
-                <div className="mx-auto flex h-full max-h-72 w-full items-center justify-center px-6 py-4">
-                  <div
-                    className={`w-full max-w-sm rounded-[2rem] border border-white/40 transition-all ${
-                      captureMode === "square"
-                        ? "aspect-square shadow-[0_0_0_999px_rgba(0,0,0,0.2)]"
-                        : "aspect-[4/3] border-dashed"
-                    }`}
-                  />
-                </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-white/70">
-                  <span>{selectedDeviceLabel || "Default camera"}</span>
-                  <span>{captureSummary || "full frame"}</span>
-                </div>
-              </div>
+              ) : null}
             </CameraPreview>
           ) : (
-            <div className="flex h-full items-center justify-center bg-[radial-gradient(circle_at_top,#1f2937,transparent_55%)] text-neutral-500">
-              {state === "starting" ? (
-                <p>Starting camera...</p>
-              ) : (
-                <p>Camera is off</p>
-              )}
+            <div className="flex h-full items-center justify-center text-sm text-neutral-400">
+              {state === "starting" ? "Starting camera…" : "Camera is off"}
             </div>
           )}
+          {holding && isBursting ? (
+            <span className="absolute top-3 left-3 rounded-md bg-red-600 px-2 py-0.5 text-xs font-medium text-white">
+              Shooting
+            </span>
+          ) : null}
         </div>
 
-        {notice ? (
-          <p className="rounded-2xl border border-blue-500/20 bg-blue-500/8 px-4 py-3 text-sm text-blue-100">
-            {notice}
-          </p>
-        ) : null}
-
-        {error ? (
-          <p className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-            Error: {error.message}
-          </p>
-        ) : null}
-
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap items-center gap-2 p-4">
           {!isActive ? (
-            <button
-              onClick={() => void handleStart()}
-              disabled={state === "starting"}
-              className="rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-black transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50"
-            >
+            <button onClick={() => void handleStart()} disabled={state === "starting"} className={button.primary}>
               Start camera
             </button>
           ) : (
             <>
-              <button
-                onClick={handleCapture}
-                disabled={!canCapture}
-                className="rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-black transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Capture still
+              <button onClick={handleCapture} disabled={!canCapture} className={button.primary}>
+                Take photo
               </button>
-              <button
-                onClick={() => handleBurst(5)}
-                disabled={isBursting || !canCapture}
-                className="rounded-full border border-white/15 bg-white/5 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Burst 5
+              <button onClick={() => handleBurst(5)} disabled={isBursting || !canCapture} className={button.outline}>
+                Burst of 5
               </button>
               <button
                 onPointerDown={(event) => {
@@ -371,181 +315,173 @@ export function CameraDemo() {
                 // Stays enabled while held so the release always reaches endHold.
                 disabled={!holding && (isBursting || !canCapture)}
                 aria-pressed={holding && isBursting}
-                className={`touch-none select-none rounded-full px-5 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${
-                  holding && isBursting ? "bg-blue-500 text-white" : "border border-white/15 bg-white/5 text-white hover:bg-white/10"
-                }`}
+                className={`${button.outline} touch-none select-none aria-pressed:border-primary aria-pressed:text-primary`}
               >
-                {holding && isBursting ? "Shooting…" : "Hold to shoot"}
+                {holding && isBursting ? "Release to stop" : "Hold to shoot"}
               </button>
-              <button
-                onClick={() => void handleSwitchCamera()}
-                className="rounded-full border border-white/15 bg-white/5 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-white/10"
-              >
-                Switch facing mode
-              </button>
-              <button
-                onClick={handleStop}
-                className="rounded-full border border-red-500/25 bg-red-500/12 px-5 py-2.5 text-sm font-medium text-red-100 transition hover:bg-red-500/18"
-              >
-                Stop stream
-              </button>
+              <div className="ml-auto flex gap-2">
+                <button onClick={() => void handleSwitchCamera()} className={button.ghost}>
+                  Switch camera
+                </button>
+                <button onClick={handleStop} className={button.ghost}>
+                  Stop
+                </button>
+              </div>
             </>
           )}
         </div>
 
-        <p aria-live="polite" className="min-h-4 text-xs text-white/55">
-          {pendingCaptures > 1 ? `${pendingCaptures} shots queued` : ""}
+        <p aria-live="polite" className="min-h-5 border-t border-border px-4 py-3 text-xs text-muted-foreground">
+          {statusLine || "Allow camera access when your browser asks."}
         </p>
       </section>
 
-      <section className="space-y-4 rounded-[2rem] border border-white/10 bg-white/5 p-4 shadow-[0_20px_60px_rgba(0,0,0,0.25)] backdrop-blur-sm">
-        <div className="space-y-1">
-          <p className="text-xs uppercase tracking-[0.32em] text-white/45">Controls</p>
-          <h2 className="text-xl font-semibold text-white">Tune the live track and output</h2>
+      {notice || error ? (
+        <div
+          role={error ? "alert" : "status"}
+          className={`rounded-lg border bg-card px-4 py-3 text-sm ${error ? "border-destructive/30 text-destructive" : "border-border text-foreground"}`}
+        >
+          {error ? error.message : notice}
+        </div>
+      ) : null}
+
+      <section className={card}>
+        <div className="px-5 py-5 sm:px-6">
+          <h2 className="text-base font-semibold">Settings</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Changes apply to the live stream and the next photo.</p>
         </div>
 
-        {isActive && devices.length > 1 ? (
-          <label className="space-y-2 text-sm text-white/70">
-            <span className="block">Camera device</span>
-            <select
-              value={selectedDeviceId}
-              onChange={handleDeviceChange}
-              className="w-full rounded-2xl border border-white/10 bg-neutral-900 px-3 py-2.5 text-sm text-white outline-none transition focus:border-blue-400"
-            >
-              {devices.map((device) => (
-                <option key={device.deviceId} value={device.deviceId}>
-                  {device.label || `Camera ${device.deviceId.slice(0, 8)}`}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : null}
-
-        <div className="space-y-3 rounded-[1.5rem] border border-white/10 bg-black/25 p-4">
-          <p className="text-sm font-medium text-white">Track presets</p>
-          <p className="text-xs text-white/45">Apply constraints without restarting the stream.</p>
-
-          <div className="flex flex-wrap gap-2">
-            {TRACK_PRESETS.map((preset) => (
-              <button
-                key={preset.label}
-                onClick={() => void applyTrackPreset(preset.width, preset.height, preset.label)}
-                disabled={!isActive}
-                className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {preset.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="space-y-3 rounded-[1.5rem] border border-white/10 bg-black/25 p-4">
-          <p className="text-sm font-medium text-white">Capture transforms</p>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setMirror((current) => !current)}
-              className={`rounded-full px-3 py-1.5 text-sm transition ${
-                mirror
-                  ? "bg-blue-500 text-white"
-                  : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
-              }`}
-            >
-              Mirror file {mirror ? "on" : "off"}
-            </button>
-            <button
-              onClick={cycleRotation}
-              className={`rounded-full px-3 py-1.5 text-sm transition ${
-                rotate
-                  ? "bg-blue-500 text-white"
-                  : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
-              }`}
-            >
-              Rotate {rotate} deg
-            </button>
-            <button
-              onClick={() => setCaptureMode((current) => (current === "full" ? "square" : "full"))}
-              className={`rounded-full px-3 py-1.5 text-sm transition ${
-                captureMode === "square"
-                  ? "bg-blue-500 text-white"
-                  : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
-              }`}
-            >
-              {captureMode === "square" ? "Square output" : "Full frame"}
-            </button>
-          </div>
-          <p className="text-xs text-white/45">
-            Square output uses center crop plus 1080x1080 resize.
-          </p>
-        </div>
-
-        <div className="space-y-3 rounded-[1.5rem] border border-white/10 bg-black/25 p-4">
-          <p className="text-sm font-medium text-white">Active track</p>
-          {settings ? (
-            <div className="grid gap-2 text-sm text-white/70 sm:grid-cols-2">
-              <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
-                Resolution {settings.width && settings.height ? `${settings.width}x${settings.height}` : "unknown"}
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
-                Frame rate {settings.frameRate ? `${Math.round(settings.frameRate)} fps` : "unknown"}
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
-                Facing {settings.facingMode ?? "unknown"}
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
-                Device {selectedDeviceLabel || "default selection"}
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm text-white/45">Start the stream to inspect settings and capabilities.</p>
-          )}
-
-          {capabilities ? (
-            <div className="grid gap-2 text-xs text-white/55 sm:grid-cols-3">
-              <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">
-                Width range {widthRange ?? "n/a"}
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">
-                Height range {heightRange ?? "n/a"}
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">
-                FPS range {frameRateRange ?? "n/a"}
-              </div>
-            </div>
+        <div className="divide-y divide-border border-t border-border">
+          {isActive && devices.length > 1 ? (
+            <Row label="Camera">
+              <select value={selectedDeviceId} onChange={handleDeviceChange} className={input}>
+                {devices.map((device) => (
+                  <option key={device.deviceId} value={device.deviceId}>
+                    {device.label || `Camera ${device.deviceId.slice(0, 8)}`}
+                  </option>
+                ))}
+              </select>
+            </Row>
           ) : null}
+
+          <Row label="Resolution" hint="Applied without restarting the stream.">
+            <div className="flex gap-2">
+              {TRACK_PRESETS.map((preset) => (
+                <button
+                  key={preset.label}
+                  onClick={() => void applyTrackPreset(preset.width, preset.height, preset.label)}
+                  disabled={!isActive}
+                  className={button.outline}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </Row>
+
+          <Row label="Photo output" hint={captureMode === "square" ? "Centre crop, resized to 1080×1080." : undefined}>
+            <div className="flex flex-wrap gap-2">
+              <Toggle pressed={captureMode === "square"} onClick={() => setCaptureMode((current) => (current === "full" ? "square" : "full"))}>
+                Square
+              </Toggle>
+              <Toggle pressed={mirror} onClick={() => setMirror((current) => !current)}>
+                Mirror
+              </Toggle>
+              <Toggle pressed={rotate !== 0} onClick={cycleRotation}>
+                Rotate {rotate}°
+              </Toggle>
+            </div>
+          </Row>
+
+          <Row label="Track">
+            {settings ? (
+              <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-3">
+                <Detail term="Frame rate" value={settings.frameRate ? `${Math.round(settings.frameRate)} fps` : "Unknown"} />
+                <Detail term="Facing" value={settings.facingMode ?? "Unknown"} />
+                <Detail term="Width range" value={widthRange ?? "Unknown"} />
+                <Detail term="Height range" value={heightRange ?? "Unknown"} />
+                <Detail term="Frame rate range" value={frameRateRange ?? "Unknown"} />
+              </dl>
+            ) : (
+              <p className="text-sm text-muted-foreground">Start the camera to see track details.</p>
+            )}
+          </Row>
         </div>
       </section>
 
-      {captures.length > 0 ? (
-        <section className="space-y-4 rounded-[2rem] border border-white/10 bg-white/5 p-4 shadow-[0_20px_60px_rgba(0,0,0,0.25)] backdrop-blur-sm lg:col-span-2">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-[0.32em] text-white/45">Captured frames</p>
-              <h2 className="text-xl font-semibold text-white">Recent stills</h2>
-            </div>
-            <button
-              onClick={clearCaptures}
-              className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white transition hover:bg-white/10"
-            >
-              Clear gallery
+      <section className={card}>
+        <div className="flex items-center justify-between gap-3 px-5 py-5 sm:px-6">
+          <div>
+            <h2 className="text-base font-semibold">Photos</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {captures.length ? `${captures.length} in this session, newest first.` : "Photos you take appear here."}
+            </p>
+          </div>
+          {captures.length ? (
+            <button onClick={clearCaptures} className={button.ghost}>
+              Clear photos
             </button>
-          </div>
+          ) : null}
+        </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {captures.length ? (
+          <ul className="grid grid-cols-2 gap-4 border-t border-border p-5 sm:grid-cols-3 sm:px-6 lg:grid-cols-4">
             {captures.map((photo, index) => (
-              <figure key={photo.url} className="space-y-2 rounded-[1.5rem] border border-white/10 bg-black/25 p-3">
-                <img
-                  src={photo.url}
-                  alt={`Capture ${index + 1}`}
-                  className="aspect-square w-full rounded-[1.25rem] object-cover"
-                />
-                <figcaption className="text-xs text-white/55">
-                  Capture {index + 1} · {photo.durationMs} ms
-                </figcaption>
-              </figure>
+              <li key={photo.url} className="space-y-1.5">
+                <img src={photo.url} alt={`Photo ${captures.length - index}`} className="aspect-square w-full rounded-md object-cover" />
+                <p className="text-xs text-muted-foreground">Taken in {photo.durationMs} ms</p>
+              </li>
             ))}
-          </div>
-        </section>
-      ) : null}
+          </ul>
+        ) : null}
+      </section>
+    </div>
+  );
+}
+
+const card = "overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10 shadow-xs";
+
+const input =
+  "h-9 w-full max-w-sm rounded-md border border-input bg-card px-2.5 text-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
+
+const buttonBase =
+  "inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-transparent px-3 text-sm font-medium transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50";
+
+const button = {
+  primary: `${buttonBase} bg-primary text-primary-foreground hover:bg-primary/85`,
+  outline: `${buttonBase} border-border bg-card shadow-xs hover:bg-muted`,
+  ghost: `${buttonBase} text-muted-foreground hover:bg-muted hover:text-foreground`,
+};
+
+function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div className="grid gap-2 px-5 py-4 sm:grid-cols-[12rem_minmax(0,1fr)] sm:gap-6 sm:px-6">
+      <div>
+        <p className="text-sm font-medium">{label}</p>
+        {hint ? <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p> : null}
+      </div>
+      <div>{children}</div>
+    </div>
+  );
+}
+
+function Toggle({ pressed, onClick, children }: { pressed: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={pressed}
+      className={`${buttonBase} border-border shadow-xs ${pressed ? "border-primary/40 bg-primary/10 text-primary" : "bg-card hover:bg-muted"}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Detail({ term, value }: { term: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-xs text-muted-foreground">{term}</dt>
+      <dd>{value}</dd>
     </div>
   );
 }
