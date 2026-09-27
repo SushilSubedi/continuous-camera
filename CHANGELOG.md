@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `capture()` queues overlapping shots and runs them in order, up to `maxPendingCaptures` (default 10)
   - `captureBurst({ count, interval, signal, ...captureOptions })` and `stopBurst()` for bursts and hold-to-shoot
   - `capture` event with each photo and its `durationMs`; `capturechange` event for queue and burst state
-  - `pendingCaptures` and `isBursting` properties; `CaptureBurstError`
+  - `pendingCaptures`, `isBursting` and `maxPendingCaptures` properties; `CaptureBurstError`
 
 ### Changed
 
@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- The video-element capture fallback (browsers without `ImageCapture`) reuses one element per stream instead of creating one per shot, and rejects instead of hanging when playback fails
+- The video-element capture fallback (browsers without `ImageCapture`) reuses one element per stream instead of creating one per shot, and rejects instead of hanging when playback fails, `stop()` interrupts the load, or loading takes over 5 seconds. A paused element is replayed before drawing
 
 ## [0.1.0] - 2025-04-04
 

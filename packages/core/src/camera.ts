@@ -33,6 +33,15 @@ interface Burst {
   wake?: () => void;
 }
 
+/** The fallback video element while it loads, so `stop()` can abandon the load. */
+interface VideoLoad {
+  element: HTMLVideoElement;
+  reject: (error: Error) => void;
+}
+
+const DEFAULT_MAX_PENDING_CAPTURES = 10;
+const VIDEO_LOAD_TIMEOUT_MS = 5000;
+
 export class Camera {
   private _state: CameraState = 'idle';
   private _stream: MediaStream | null = null;
@@ -45,6 +54,7 @@ export class Camera {
   private _pending = 0;
   private _burst: Burst | null = null;
   private _video: Promise<HTMLVideoElement> | null = null;
+  private _videoLoad: VideoLoad | null = null;
 
   constructor(options: CameraOptions = {}) {
     this._options = options;
@@ -75,6 +85,11 @@ export class Camera {
 
   get isBursting(): boolean {
     return this._burst !== null;
+  }
+
+  /** The configured queue limit (`maxPendingCaptures`, default 10) */
+  get maxPendingCaptures(): number {
+    return this._options.maxPendingCaptures ?? DEFAULT_MAX_PENDING_CAPTURES;
   }
 
   // -- Lifecycle --
@@ -180,7 +195,7 @@ export class Camera {
     if (!this._stream.getVideoTracks()[0]) {
       return Promise.reject(new Error('No video track available.'));
     }
-    const maxPending = this._options.maxPendingCaptures ?? 10;
+    const maxPending = this.maxPendingCaptures;
     if (!Number.isInteger(maxPending) || maxPending < 1) {
       return Promise.reject(new RangeError('maxPendingCaptures must be a positive integer'));
     }
@@ -250,7 +265,7 @@ export class Camera {
     }
   }
 
-  /** Ends a running burst after its in-flight shot */
+  /** Ends a running burst after its in-flight shot; a new burst can start immediately */
   stopBurst(): void {
     if (this._burst) this._endBurst(this._burst);
   }
@@ -291,36 +306,54 @@ export class Camera {
   private async _drain(session: CaptureSession): Promise<void> {
     if (session.running) return;
     session.running = true;
-    while (session === this._session && session.queue.length > 0) {
-      const job = session.queue.shift()!;
-      const started = Date.now();
-      try {
-        const blob = await this._captureFrame(job.options);
-        this._emitCapture({ blob, durationMs: Date.now() - started });
-        job.resolve(blob);
-      } catch (err) {
-        job.reject(err instanceof Error ? err : new Error(String(err)));
-      } finally {
-        this._setPending(this._pending - 1);
+    try {
+      while (session === this._session && session.queue.length > 0) {
+        const job = session.queue.shift()!;
+        const started = Date.now();
+        try {
+          const blob = await this._captureFrame(job.options);
+          this._emitGuarded('capture', { blob, durationMs: Date.now() - started });
+          job.resolve(blob);
+        } catch (err) {
+          job.reject(err instanceof Error ? err : new Error(String(err)));
+        } finally {
+          this._setPending(this._pending - 1);
+        }
       }
+    } finally {
+      session.running = false;
     }
-    session.running = false;
   }
 
   private _cancelCaptures(): void {
     const cancelled = this._session.queue.splice(0);
     this._session = { queue: [], running: false };
     this._burst?.wake?.();
-    if (cancelled.length > 0) this._setPending(this._pending - cancelled.length);
     cancelled.forEach((job) => job.reject(new Error('Camera stopped')));
+    if (cancelled.length > 0) this._setPending(this._pending - cancelled.length);
+    this._releaseVideo(new Error('Camera stopped'));
+  }
+
+  /** Detaches the fallback video element and settles a load still in progress. */
+  private _releaseVideo(reason: Error): void {
     const video = this._video;
+    const load = this._videoLoad;
     this._video = null;
+    this._videoLoad = null;
+    if (load) {
+      load.element.srcObject = null;
+      load.reject(reason);
+    }
     video?.then((element) => { element.srcObject = null; }, () => {});
   }
 
   private _endBurst(burst: Burst): void {
     burst.stopped = true;
     burst.wake?.();
+    if (this._burst === burst) {
+      this._burst = null;
+      this._emitCaptureChange();
+    }
   }
 
   private _setPending(pending: number): void {
@@ -329,14 +362,17 @@ export class Camera {
   }
 
   private _emitCaptureChange(): void {
-    this._emit('capturechange', { pending: this._pending, bursting: this._burst !== null });
+    this._emitGuarded('capturechange', { pending: this._pending, bursting: this._burst !== null });
   }
 
-  /** A throwing `capture` listener must not lose the photo, so its error is reported asynchronously. */
-  private _emitCapture(photo: { blob: Blob; durationMs: number }): void {
-    this._listeners.get('capture')?.forEach((handler) => {
+  /**
+   * Capture events fire from inside the queue. A throwing listener must not lose a photo or stall
+   * the queue, so its error is reported asynchronously, like a DOM event handler's.
+   */
+  private _emitGuarded<K extends 'capture' | 'capturechange'>(event: K, data: CameraEventMap[K]): void {
+    this._listeners.get(event)?.forEach((handler) => {
       try {
-        handler(photo);
+        handler(data);
       } catch (err) {
         queueMicrotask(() => { throw err; });
       }
@@ -388,6 +424,8 @@ export class Camera {
     if (!videoTrack) return;
 
     this._trackEndedHandler = () => {
+      // An ended track leaves the fallback element showing its last frame forever.
+      this._releaseVideo(new Error('The camera track ended'));
       this._emit('trackended', undefined);
     };
     videoTrack.addEventListener('ended', this._trackEndedHandler);
@@ -461,19 +499,30 @@ export class Camera {
     return canvas;
   }
 
-  /** One playing video element per stream, reused so repeated shots skip the load and play. */
+  /**
+   * One playing video element per stream, reused so repeated shots skip the load and play.
+   * `stop()` or a timeout rejects a load that never finishes, so a shot can't hang the queue.
+   */
   private _getVideo(): Promise<HTMLVideoElement> {
     if (this._video) return this._video;
-    const stream = this._stream;
+    const element = document.createElement('video');
     const video = new Promise<HTMLVideoElement>((resolve, reject) => {
-      const element = document.createElement('video');
-      element.srcObject = stream;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const settle = (error?: unknown) => {
+        clearTimeout(timer);
+        if (this._videoLoad?.element === element) this._videoLoad = null;
+        if (error === undefined) resolve(element);
+        else reject(error instanceof Error ? error : new Error(String(error)));
+      };
+      timer = setTimeout(() => settle(new Error('Timed out loading the camera stream')), VIDEO_LOAD_TIMEOUT_MS);
+      this._videoLoad = { element, reject: (error) => settle(error) };
+      element.srcObject = this._stream;
       element.muted = true;
       element.playsInline = true;
       element.onloadedmetadata = () => {
-        element.play().then(() => resolve(element), reject);
+        element.play().then(() => settle(), settle);
       };
-      element.onerror = () => reject(new Error('Failed to load the camera stream'));
+      element.onerror = () => settle(new Error('Failed to load the camera stream'));
     });
     this._video = video;
     // Let the next shot retry after a failed load.
@@ -489,6 +538,8 @@ export class Camera {
     captureOptions: CaptureOptions,
   ): Promise<Blob> {
     const video = await this._getVideo();
+    // WebKit pauses media when the page is hidden; a paused element keeps returning one frame.
+    if (video.paused || video.readyState < 2) await video.play();
     const hasTransforms = captureOptions.crop || captureOptions.resize || captureOptions.mirror || captureOptions.rotate;
 
     if (hasTransforms) {

@@ -139,6 +139,7 @@ Factory function that creates a new `Camera` instance.
 | `isActive` | `boolean` | Whether the camera is currently streaming |
 | `pendingCaptures` | `number` | Queued plus in-flight shots |
 | `isBursting` | `boolean` | Whether a burst is running |
+| `maxPendingCaptures` | `number` | The queue limit in effect |
 
 #### `CameraOptions`
 
@@ -179,12 +180,21 @@ camera.on('capture', ({ blob, durationMs }) => save(blob));
 
 await camera.capture();                                // Tap: queue one shot
 await camera.captureBurst({ count: 5, interval: 200 }); // Burst
-button.onpointerdown = () => camera.captureBurst();     // Hold to shoot…
-button.onpointerup = () => camera.stopBurst();          // …until release
+
+// Hold to shoot until release. Pointer capture keeps the release on the button,
+// and cancel/lost-capture cover gestures the browser takes over.
+button.addEventListener('pointerdown', (event) => {
+  button.setPointerCapture(event.pointerId);
+  camera.captureBurst().catch(console.error);
+});
+for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+  button.addEventListener(type, () => camera.stopBurst());
+}
 ```
 
 - Shots run one at a time in order. Calling `capture()` while a shot is running queues the next one instead of overlapping it. Beyond `maxPendingCaptures`, `capture()` rejects with `Capture queue is full`.
-- `stop()`, `switchCamera()`, `selectDevice()` and `destroy()` cancel shots that have not started; they reject with `Camera stopped`. A shot already in flight still resolves.
+- `stop()`, `switchCamera()`, `selectDevice()` and `destroy()` cancel shots that have not started; they reject with `Camera stopped`. A shot already in flight is not cancelled; it resolves or rejects depending on whether the browser finished reading the frame.
+- `stopBurst()` ends the burst after its in-flight shot and frees it at once, so the next `captureBurst()` can start immediately.
 - `captureBurst()` resolves with every photo taken. If a shot fails, it rejects with `CaptureBurstError`, whose `photos` holds the shots already taken. Every photo is also emitted as `capture`, so handle each one in a single place.
 - Without the `ImageCapture` API (Safari, Firefox), frames are drawn from one reused video element, so repeated shots skip reloading the stream.
 

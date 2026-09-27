@@ -498,6 +498,109 @@ describe('rapid capture', () => {
     report.mockRestore();
   });
 
+  it('keeps the queue running when a capturechange listener throws', async () => {
+    setupMediaDevices();
+    setupCapture();
+    const camera = new Camera();
+    await camera.start();
+    const errors: unknown[] = [];
+    const report = vi.spyOn(globalThis, 'queueMicrotask').mockImplementation((task) => {
+      try { task(); } catch (error) { errors.push(error); }
+    });
+    camera.on('capturechange', () => { throw new Error('listener failed'); });
+    const blobs = await Promise.all([camera.capture(), camera.capture()]);
+    expect(blobs).toHaveLength(2);
+    expect(await camera.capture()).toBeInstanceOf(Blob);
+    expect(camera.pendingCaptures).toBe(0);
+    expect(errors.length).toBeGreaterThan(0);
+    report.mockRestore();
+  });
+
+  it('exposes the effective queue limit', () => {
+    expect(new Camera().maxPendingCaptures).toBe(10);
+    expect(new Camera({ maxPendingCaptures: 3 }).maxPendingCaptures).toBe(3);
+  });
+
+  describe('video-element fallback', () => {
+    function setupVideoElement() {
+      const elements: Array<Record<string, any>> = [];
+      const drawImage = vi.fn();
+      Object.defineProperty(globalThis, 'document', {
+        value: {
+          createElement: (tag: string) => {
+            if (tag === 'canvas') {
+              return {
+                getContext: () => ({ drawImage }),
+                toBlob: (done: (blob: Blob) => void) => done(new Blob(['frame'])),
+              };
+            }
+            const element: Record<string, any> = { paused: true, readyState: 0, videoWidth: 640, videoHeight: 480 };
+            element.play = vi.fn(() => {
+              element.paused = false;
+              element.readyState = 4;
+              return Promise.resolve();
+            });
+            elements.push(element);
+            return element;
+          },
+        },
+        writable: true,
+        configurable: true,
+      });
+      return { elements, drawImage };
+    }
+
+    afterEach(() => {
+      Object.defineProperty(globalThis, 'document', { value: undefined, writable: true, configurable: true });
+    });
+
+    it('reuses one playing element and replays it if the browser paused it', async () => {
+      setupMediaDevices();
+      const { elements, drawImage } = setupVideoElement();
+      const camera = new Camera();
+      await camera.start();
+
+      const first = camera.capture();
+      await flush();
+      elements[0]!.onloadedmetadata();
+      expect(await first).toBeInstanceOf(Blob);
+
+      elements[0]!.paused = true;
+      expect(await camera.capture()).toBeInstanceOf(Blob);
+      expect(elements).toHaveLength(1);
+      expect(elements[0]!.play).toHaveBeenCalledTimes(2);
+      expect(drawImage).toHaveBeenCalledTimes(2);
+    });
+
+    it('rejects a shot whose stream never loads when the camera stops, freeing the queue', async () => {
+      setupMediaDevices();
+      const { elements } = setupVideoElement();
+      const camera = new Camera();
+      await camera.start();
+
+      const burst = camera.captureBurst().catch((error: unknown) => error);
+      await flush();
+      expect(elements).toHaveLength(1);
+      camera.stop();
+      expect(await burst).toEqual([]);
+      expect(camera.pendingCaptures).toBe(0);
+      expect(camera.isBursting).toBe(false);
+      expect(elements[0]!.srcObject).toBeNull();
+    });
+
+    it('times out a load that never finishes', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      setupMediaDevices();
+      setupVideoElement();
+      const camera = new Camera();
+      await camera.start();
+      const shot = camera.capture().catch((error: Error) => error);
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(await shot).toMatchObject({ message: 'Timed out loading the camera stream' });
+      expect(camera.pendingCaptures).toBe(0);
+    });
+  });
+
   describe('captureBurst()', () => {
     it('takes count photos with the given capture options', async () => {
       setupMediaDevices();
@@ -580,6 +683,24 @@ describe('rapid capture', () => {
       expect(grabFrame).toHaveBeenCalledTimes(2);
       camera.stopBurst();
       expect(await burst).toHaveLength(2);
+    });
+
+    it('lets a new burst start right after stopBurst, while the old shot is still in flight', async () => {
+      setupMediaDevices();
+      const { hold } = setupCapture();
+      const camera = new Camera();
+      await camera.start();
+      const release = hold();
+      const first = camera.captureBurst();
+      await flush();
+      camera.stopBurst();
+      expect(camera.isBursting).toBe(false);
+      const second = camera.captureBurst({ count: 1 });
+      expect(camera.isBursting).toBe(true);
+      release();
+      expect(await first).toHaveLength(1);
+      expect(await second).toHaveLength(1);
+      expect(camera.isBursting).toBe(false);
     });
 
     it('validates options and requires an active camera', async () => {
