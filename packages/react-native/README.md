@@ -1,6 +1,6 @@
 # @continuous-camera/react-native
 
-React Native camera support for Continuous Camera, built on VisionCamera 5 and inspired by the camera flow in `listengine-mobile`. This package lives in the Continuous Camera monorepo and is independent of the browser packages.
+React Native camera support for Continuous Camera, built on VisionCamera 5. This package lives in the Continuous Camera monorepo and is independent of the browser packages.
 
 Status: unreleased. Verified on an Android 16 emulator (capture, queue, bursts, hold-to-shoot, lifecycle) and on the iOS Simulator (launch and permissions only; it has no camera). Not yet verified on physical devices. Developed against React Native 0.81.5, React 19.1, and VisionCamera 5.0.11. VisionCamera 4 is not supported.
 

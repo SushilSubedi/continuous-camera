@@ -1,4 +1,5 @@
 import { CameraDemo } from "./components/camera-demo";
+import { MobileShowcase } from "./components/mobile-showcase";
 
 export default function Home() {
   return (
@@ -25,6 +26,8 @@ export default function Home() {
         </div>
 
         <CameraDemo />
+
+        <MobileShowcase />
       </div>
     </main>
   );

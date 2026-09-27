@@ -18,7 +18,7 @@ export function useCaptures() {
   const [photos, setPhotos] = useState<DemoPhoto[]>([]);
   const [saving, setSaving] = useState(0);
   const [clearing, setClearing] = useState(false);
-  const [message, setMessage] = useState("Tap to capture, hold for continuous. Photos stay in this app's cache.");
+  const [error, setError] = useState<string | null>(null);
   const mounted = useRef(false);
   const saved = useRef<DemoPhoto[]>([]);
   useEffect(() => {
@@ -26,8 +26,8 @@ export function useCaptures() {
     return () => { mounted.current = false; };
   }, []);
 
-  function report(error: unknown) {
-    if (mounted.current) setMessage(error instanceof Error ? error.message : String(error));
+  function report(cause: unknown) {
+    if (mounted.current) setError(cause instanceof Error ? cause.message : String(cause));
   }
 
   async function saveOne(photo: CapturedPhoto) {
@@ -50,7 +50,7 @@ export function useCaptures() {
       const result = { uri, method: photo.method, elapsedMs: photo.durationMs, ...dimensions, bytes: info.size };
       saved.current = [result, ...saved.current];
       setPhotos(saved.current);
-      setMessage(`${photo.method} · ${photo.durationMs} ms · ${dimensions.width} × ${dimensions.height} · ${Math.round(info.size / 1024)} KB`);
+      setError(null);
     } catch (error) {
       if (uri) await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
       throw error;
@@ -74,13 +74,12 @@ export function useCaptures() {
       for (const photo of saved.current) await FileSystem.deleteAsync(photo.uri, { idempotent: true });
       saved.current = [];
       setPhotos([]);
-      setMessage("Photos cleared.");
-    } catch (error) {
-      report(error);
+    } catch (cause) {
+      report(cause);
     } finally {
       setClearing(false);
     }
   }
 
-  return { photos, busy: saving > 0 || clearing, message, setMessage, report, save, clear };
+  return { photos, busy: saving > 0 || clearing, error, report, save, clear };
 }
