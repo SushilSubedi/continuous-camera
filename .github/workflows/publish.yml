@@ -14,9 +14,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # Version comes from package.json "packageManager"; setting it here too fails the action.
       - uses: pnpm/action-setup@v6
-        with:
-          version: 9
 
       - uses: actions/setup-node@v6
         with:
