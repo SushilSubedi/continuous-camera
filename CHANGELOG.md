@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `@continuous-camera/core` 0.3.0 — rapid capture
+- `@continuous-camera/core` — rapid capture
   - `capture()` queues overlapping shots and runs them in order, up to `maxPendingCaptures` (default 10)
   - `captureBurst({ count, interval, signal, ...captureOptions })` and `stopBurst()` for bursts and hold-to-shoot
   - `capture` event with each photo and its `durationMs`; `capturechange` event for queue and burst state
