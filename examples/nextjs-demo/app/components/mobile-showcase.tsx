@@ -17,8 +17,8 @@ const SNIPPET = `const camera = useCamera({ onCapture: savePhoto });
 
 <CameraPreview camera={camera} />
 <Pressable
-  onPress={() => camera.capture()}
-  onLongPress={() => camera.captureBurst()}
+  onPress={() => camera.capture().catch(report)}
+  onLongPress={() => camera.captureBurst().catch(report)}
   onPressOut={camera.stopBurst}
 />`;
 

@@ -37,7 +37,8 @@ function Shutter({ disabled, shooting, onPress, onHoldStart, onHoldEnd }: {
     // Stays enabled mid-burst so releasing the hold always reaches stopBurst.
     disabled={disabled && !shooting}
     onPress={() => { if (!shooting) onPress(); }}
-    onLongPress={() => { holding.current = true; onHoldStart(); }}
+    // A hold during a tap-started burst would restart and then cut it short; ignore it.
+    onLongPress={() => { if (shooting) return; holding.current = true; onHoldStart(); }}
     onPressIn={() => pressTo(1)}
     onPressOut={() => {
       pressTo(0);
@@ -79,13 +80,16 @@ function CameraDemo() {
   const [mode, setMode] = useState<ShootMode>('photo');
   const [shotsThisBurst, setShotsThisBurst] = useState(0);
   const [burstTarget, setBurstTarget] = useState<number | undefined>();
+  // Shots already queued when a burst starts land first; they aren't the burst's.
+  const skipBeforeBurst = useRef(0);
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const gallery = useCaptures();
   const blink = useRef(new Animated.Value(0)).current;
 
   function onCapture(photo: CapturedPhoto) {
     gallery.save(photo);
-    setShotsThisBurst((count) => count + 1);
+    if (skipBeforeBurst.current > 0) skipBeforeBurst.current -= 1;
+    else setShotsThisBurst((count) => count + 1);
     blink.setValue(0.45);
     Animated.timing(blink, { toValue: 0, duration: 160, useNativeDriver: true }).start();
   }
@@ -108,6 +112,8 @@ function CameraDemo() {
 
   // Every photo reaches gallery.save through onCapture, including those from a failed burst.
   function burst(count?: number) {
+    if (camera.isBursting) return;
+    skipBeforeBurst.current = camera.pendingCaptures;
     setShotsThisBurst(0);
     setBurstTarget(count);
     camera.captureBurst({ count }).catch(gallery.report);

@@ -98,7 +98,7 @@ export function CaptureScreen({
 
 HD is the photo capture path, not a promise of a specific pixel count. Actual resolution depends on the device. On iOS, both preferences use the photo path and `effectiveCaptureMode` is always `hd`.
 
-Use `defaultCaptureMode` and `camera.setCaptureMode('fast' | 'hd')` for a built-in preference, or pass `captureMode` from your app's state for controlled mode selection. In controlled mode, update that app state to change the mode; the hook's setter only changes its internal preference. The earlier `androidCaptureMode` option remains a deprecated controlled alias; `captureMode` takes precedence.
+Use `defaultCaptureMode` and `camera.setCaptureMode('fast' | 'hd')` for a built-in preference, or pass `captureMode` from your app's state for controlled mode selection. In controlled mode, update that app state to change the mode; the hook's setter only changes its internal preference.
 
 - `captureMode`: the selected preference.
 - `effectiveCaptureMode`: the mode that will actually capture, accounting for platform and flash.
@@ -115,18 +115,31 @@ Shots are queued, never dropped. Hand every photo to `onCapture` so your app sav
 const camera = useCamera({ onCapture: (photo) => void savePhoto(photo) });
 
 // Tap: queue one shot. Tapping faster than the camera can capture queues more.
-await camera.capture();
+await camera.capture(); // rejects if the camera isn't ready, or with `Camera stopped`
 
 // Burst: a fixed number of shots, optionally spaced by `interval` milliseconds.
 const photos = await camera.captureBurst({ count: 5, interval: 200 });
 
-// Hold to shoot: capture until released.
-<Pressable onLongPress={() => void camera.captureBurst()} onPressOut={camera.stopBurst} />
+// Hold to shoot: capture until released. Only stop a burst the hold started,
+// so releasing a tap can't cut another burst short.
+const holding = useRef(false);
+<Pressable
+  onLongPress={() => {
+    if (camera.isBursting) return;
+    holding.current = true;
+    camera.captureBurst().catch(reportError);
+  }}
+  onPressOut={() => {
+    if (holding.current) camera.stopBurst();
+    holding.current = false;
+  }}
+/>
 ```
 
 - `capture()` queues a shot and resolves with it. Shots run one at a time in order, because the native camera captures serially. The next shot starts as soon as the previous file is written, without waiting for your app to process it.
 - `maxPendingCaptures` (default `10`) caps queued plus in-flight shots; beyond it `capture()` rejects with `Capture queue is full`. `canCapture` is false while the queue is full.
-- Stopping, switching, backgrounding or deactivating the camera cancels shots that have not started. They reject with `Camera stopped`. A shot already in flight still resolves, so its file is never lost.
+- Stopping, backgrounding or deactivating the camera cancels shots that have not started. They reject with `Camera stopped`, which apps can treat as expected rather than as an error. A shot already in flight is not cancelled; if it resolves, its file still reaches `onCapture`.
+- `switchCamera()` does nothing while shots are pending or a burst is running, and `canSwitchCamera` is false then, so a switch never drops shots silently.
 - `captureBurst({ count?, interval?, signal? })` captures until `count` is reached, `stopBurst()` is called, `signal` aborts, or the camera stops, then resolves with the photos taken. Omit `count` for an unlimited burst. `interval` is the minimum time between the starts of consecutive shots; `stopBurst()` also cuts a pending interval short. Only one burst runs at a time.
 - If a shot in a burst fails, `captureBurst` rejects with `CaptureBurstError`. Its `photos` are the shots already taken; they were also passed to `onCapture`, so handle each file in one place.
 - `pendingCaptures`, `isCapturing` and `isBursting` describe the queue for your UI. `CapturedPhoto.durationMs` reports each shot's native capture time.
@@ -141,7 +154,7 @@ const photos = await camera.captureBurst({ count: 5, interval: 200 });
 - Pass navigation focus and review-overlay state through `isActive`; the hook separately pauses when the app backgrounds. A resumed or switched camera must report readiness again before capture.
 - `capture()` keeps the preview open for repeated shots; see [Rapid capture](#rapid-capture) for queueing and bursts. Processing captured files (saving, uploading) is up to your app.
 - Android `fast` mode (default) saves a JPEG from the preview. The preview uses VisionCamera's `compatible` (TextureView) mode, because snapshots of the default SurfaceView came back black or partly drawn during back-to-back captures on an Android 16 emulator. Resolution is determined by the preview and quality may differ from a full photo. `hd` mode and all iOS captures use the photo output. Flash forces photo output on Android.
-- `quality` defaults to `0.9` and must be in `[0, 1]`. `resolution` defaults to `{ width: 2560, height: 1920 }` and is a preferred photo-output resolution, not a guarantee or a snapshot resize.
+- `quality` defaults to `0.9` and must be in `[0, 1]`; `maxPendingCaptures` must be a positive integer. Invalid values throw a `RangeError` during render, as a programming error. `resolution` defaults to `{ width: 2560, height: 1920 }` and is a preferred photo-output resolution, not a guarantee or a snapshot resize.
 - `facingMode` sets the initial camera (`environment` by default). Back-camera selection prefers a wide-angle sensor to reduce lens switching during repeated capture. Use `switchCamera()` afterward.
 - `CapturedPhoto` contains `{ uri, filePath, method, durationMs }`. Files are temporary: move/save or delete them in your app. Snapshot native resources are disposed after saving, including on save errors. A capture already in flight can still resolve after stop or unmount so callers can retain or remove its file.
 

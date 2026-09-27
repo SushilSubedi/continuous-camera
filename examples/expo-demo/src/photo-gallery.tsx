@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { FlatList, Image, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from './theme';
 import type { DemoPhoto } from './use-captures';
 
@@ -25,7 +25,9 @@ export function PhotoGallery({ visible, photos, busy, onClose, onClear }: {
   const size = (width - GAP * (COLUMNS + 1)) / COLUMNS;
   const close = () => { setSelected(null); onClose(); };
 
+  // A Modal renders outside the app's SafeAreaProvider, so it needs its own for correct insets.
   return <Modal visible={visible} onRequestClose={selected ? () => setSelected(null) : close} animationType="slide">
+    <SafeAreaProvider>
     <SafeAreaView style={styles.sheet}>
       <View style={styles.header}>
         <Pressable onPress={selected ? () => setSelected(null) : close} hitSlop={12} accessibilityRole="button">
@@ -55,6 +57,7 @@ export function PhotoGallery({ visible, photos, busy, onClose, onClear }: {
         <Text style={styles.emptyText}>No photos yet. Tap the shutter, or hold it to shoot continuously.</Text>
       </View>}
     </SafeAreaView>
+    </SafeAreaProvider>
   </Modal>;
 }
 

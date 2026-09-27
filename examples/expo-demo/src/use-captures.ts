@@ -27,7 +27,10 @@ export function useCaptures() {
   }, []);
 
   function report(cause: unknown) {
-    if (mounted.current) setError(cause instanceof Error ? cause.message : String(cause));
+    const message = cause instanceof Error ? cause.message : String(cause);
+    // Pausing, backgrounding or flipping cancels queued shots on purpose; that isn't an error.
+    if (message === 'Camera stopped') return;
+    if (mounted.current) setError(message);
   }
 
   async function saveOne(photo: CapturedPhoto) {

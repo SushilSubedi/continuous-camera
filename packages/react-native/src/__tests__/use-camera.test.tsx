@@ -141,6 +141,21 @@ describe('useCamera', () => {
     expect(result.current.pendingCaptures).toBe(0);
   });
 
+  it('blocks switching cameras while a burst is running, even between shots', async () => {
+    const { result } = renderHook(() => useCamera({ captureMode: 'hd' }));
+    ready(result);
+    let burst!: Promise<unknown[]>;
+    act(() => { burst = result.current.captureBurst({ count: 2, interval: 60_000 }); });
+    await act(async () => { await flush(); });
+    expect(result.current.pendingCaptures).toBe(0);
+    expect(result.current.canSwitchCamera).toBe(false);
+    act(() => result.current.switchCamera());
+    expect(result.current.device?.id).toBe('back');
+    act(() => result.current.stopBurst());
+    await act(async () => { await burst; });
+    expect(result.current.canSwitchCamera).toBe(true);
+  });
+
   describe('captureBurst', () => {
     it('takes count photos and delivers each to onCapture', async () => {
       const onCapture = vi.fn();
@@ -290,7 +305,7 @@ describe('useCamera', () => {
 
   it('recovers from capture failure', async () => {
     native.capture.mockRejectedValueOnce(new Error('Disk full'));
-    const { result } = renderHook(() => useCamera({ androidCaptureMode: 'hd' }));
+    const { result } = renderHook(() => useCamera({ captureMode: 'hd' }));
     ready(result);
     await act(async () => { await expect(result.current.capture()).rejects.toThrow('Disk full'); });
     expect(result.current.error?.message).toBe('Disk full');

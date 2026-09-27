@@ -7,7 +7,7 @@ import {
   type CameraRef,
   type CameraViewProps,
 } from 'react-native-vision-camera';
-import { capturePhoto, selectCaptureMethod, type CaptureMode, type AndroidCaptureMode, type CapturedPhoto } from './capture';
+import { capturePhoto, selectCaptureMethod, type CaptureMode, type CapturedPhoto } from './capture';
 
 export interface CameraOptions {
   /** Set false when the screen loses navigation focus or a review overlay opens. */
@@ -18,8 +18,6 @@ export interface CameraOptions {
   captureMode?: CaptureMode;
   /** Initial uncontrolled capture preference. Default: fast. */
   defaultCaptureMode?: CaptureMode;
-  /** @deprecated Use captureMode. */
-  androidCaptureMode?: AndroidCaptureMode;
   /** JPEG quality from 0 to 1. Default: 0.9. */
   quality?: number;
   /** Preferred photo resolution; does not affect preview snapshots. */
@@ -72,7 +70,7 @@ export function useCamera(options: CameraOptions = {}) {
   const [foreground, setForeground] = useState(AppState.currentState === 'active');
   const [flashEnabled, setFlashEnabled] = useState(false);
   const [localCaptureMode, setCaptureMode] = useState<CaptureMode>(options.defaultCaptureMode ?? 'fast');
-  const captureMode = options.captureMode ?? options.androidCaptureMode ?? localCaptureMode;
+  const captureMode = options.captureMode ?? localCaptureMode;
   const usesFlash = flashEnabled && Boolean(device?.hasFlash);
   const captureMethod = selectCaptureMethod(Platform.OS, captureMode, usesFlash);
   const effectiveCaptureMode: CaptureMode = captureMethod === 'preview-snapshot' ? 'fast' : 'hd';
@@ -103,6 +101,7 @@ export function useCamera(options: CameraOptions = {}) {
     targetResolution,
     qualityPrioritization: device?.supportsSpeedQualityPrioritization ? 'speed' : 'balanced',
   });
+  // A new outputs array would make VisionCamera reconfigure the session on every render.
   const outputs = useMemo(() => [photoOutput], [photoOutput]);
   // Queued shots run after later renders; they read the settings current at their turn.
   const latest = useRef({ photoOutput, captureMode, usesFlash, quality, onCapture: options.onCapture });
@@ -114,6 +113,8 @@ export function useCamera(options: CameraOptions = {}) {
       if (state !== 'active') currentSession.current.ready = false;
       setForeground(state === 'active');
     });
+    // The app may have become active between render and subscribing.
+    setForeground(AppState.currentState === 'active');
     return () => {
       mounted.current = false;
       currentSession.current.ready = false;
@@ -132,7 +133,7 @@ export function useCamera(options: CameraOptions = {}) {
   }
 
   function switchCamera() {
-    if (!front || !back || pending.current > 0) return;
+    if (!front || !back || pending.current > 0 || burst.current) return;
     session.ready = false;
     setReadySession(null);
     setFlashEnabled(false);
@@ -276,13 +277,13 @@ export function useCamera(options: CameraOptions = {}) {
     isActive: active,
     /** True while the session is ready and the capture queue has room; shots may already be pending. */
     canCapture: isReady && pendingCaptures < maxPending,
-    canSwitchCamera: Boolean(front && back) && !isCapturing,
+    canSwitchCamera: Boolean(front && back) && !isCapturing && !isBursting,
     canUseFlash: Boolean(device?.hasFlash),
     canFocus: Boolean(device?.supportsFocusMetering),
     /** Fast capture is available on Android when flash is not in use. */
     canUseFastMode: Platform.OS === 'android' && !usesFlash,
     captureMode, effectiveCaptureMode, captureMethod,
-    /** Updates the preference when captureMode/androidCaptureMode is uncontrolled. */
+    /** Updates the preference when captureMode is uncontrolled. */
     setCaptureMode,
     flashEnabled, setFlashEnabled, capture, captureBurst, stopBurst, stop, switchCamera,
     /** Permission must be requested explicitly through permission.requestPermission(). */

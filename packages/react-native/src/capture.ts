@@ -1,8 +1,6 @@
 import type { CameraPhotoOutput, CameraRef } from 'react-native-vision-camera';
 
 export type CaptureMode = 'fast' | 'hd';
-/** @deprecated Use CaptureMode. */
-export type AndroidCaptureMode = CaptureMode;
 export type CaptureMethod = 'preview-snapshot' | 'photo';
 
 export interface CapturedPhoto {
@@ -16,7 +14,7 @@ export interface CapturedPhoto {
 
 export function selectCaptureMethod(
   platform: string,
-  mode: AndroidCaptureMode,
+  mode: CaptureMode,
   flash: boolean,
 ): CaptureMethod {
   return platform === 'android' && mode === 'fast' && !flash
@@ -28,7 +26,7 @@ export async function capturePhoto(options: {
   camera: Pick<CameraRef, 'takeSnapshot'>;
   photoOutput: Pick<CameraPhotoOutput, 'capturePhotoToFile'>;
   platform: string;
-  mode: AndroidCaptureMode;
+  mode: CaptureMode;
   flash: boolean;
   quality: number;
 }): Promise<CapturedPhoto> {
