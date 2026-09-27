@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `@continuous-camera/react-native` (not yet published): React Native hooks and preview on VisionCamera 5 with the same rapid-capture API, plus the `examples/expo-demo` camera app
+
+## [0.3.0] - 2026-09-27
+
+### Added
+
 - `@continuous-camera/core` — rapid capture
   - `capture()` queues overlapping shots and runs them in order, up to `maxPendingCaptures` (default 10)
   - `captureBurst({ count, interval, signal, ...captureOptions })` and `stopBurst()` for bursts and hold-to-shoot
@@ -23,7 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `capture()` calls that overlap now run one at a time in order instead of concurrently
 - `stop()`, `switchCamera()`, `selectDevice()` and `destroy()` reject shots that have not started with `Camera stopped`
+- `useCamera` methods keep a stable identity across renders and camera rebuilds, and a rebuilt camera resets `state`, `stream` and `error`
 
 ### Fixed
 
