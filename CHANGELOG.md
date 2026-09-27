@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `capture` event with each photo and its `durationMs`; `capturechange` event for queue and burst state
   - `pendingCaptures`, `isBursting` and `maxPendingCaptures` properties; `CaptureBurstError`
 
+- `@continuous-camera/react` — rapid capture
+  - `useCamera` returns `captureBurst`, `stopBurst`, `pendingCaptures`, `isCapturing`, `isBursting` and `canCapture`
+  - `onCapture` option receives every photo; an inline callback does not restart the camera
+  - Re-exports `CaptureBurstError`, `CaptureBurstOptions` and `CapturedPhoto`
+- Next.js demo: Burst 5, hold-to-shoot, queued-shot count, and per-photo capture time
+
 ### Changed
 
 - `stop()`, `switchCamera()`, `selectDevice()` and `destroy()` reject shots that have not started with `Camera stopped`

@@ -231,10 +231,18 @@ interface UseCameraReturn {
   getCapabilities: () => MediaTrackCapabilities | null;
   getSettings: () => MediaTrackSettings | null;
   capture: (options?: CaptureOptions) => Promise<Blob>;
+  captureBurst: (options?: CaptureBurstOptions) => Promise<Blob[]>;
+  stopBurst: () => void;
+  pendingCaptures: number; // queued plus in-flight shots
+  isCapturing: boolean;
+  isBursting: boolean;
+  canCapture: boolean;     // active and the capture queue has room
   getDevices: () => Promise<MediaDeviceInfo[]>;
   camera: Camera; // underlying Camera instance
 }
 ```
+
+`useCamera` accepts all `CameraOptions` plus `onCapture: (photo: CapturedPhoto) => void`, called with every photo from `capture()` and `captureBurst()`. An inline `onCapture` does not restart the camera.
 
 #### `<CameraPreview />`
 
@@ -270,7 +278,7 @@ Requires browsers with [MediaDevices.getUserMedia()](https://caniuse.com/stream)
 
 See the [`examples/`](./examples) directory:
 
-- **[Next.js Demo](./examples/nextjs-demo)** — Full demo with capture gallery
+- **[Next.js Demo](./examples/nextjs-demo)** — Full demo with capture gallery, bursts, and hold-to-shoot
 
 ```bash
 cd examples/nextjs-demo

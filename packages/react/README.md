@@ -42,7 +42,31 @@ function Camera() {
 
 ### `useCamera(options?)`
 
-Returns `{ state, stream, error, isActive, start, stop, switchCamera, capture, getDevices, camera }`.
+Returns `{ state, stream, error, isActive, start, stop, switchCamera, capture, captureBurst, stopBurst, pendingCaptures, isCapturing, isBursting, canCapture, getDevices, camera }`.
+
+Accepts all `CameraOptions` plus `onCapture`, which receives every photo as it lands. An inline `onCapture` does not restart the camera.
+
+### Rapid capture
+
+```tsx
+const camera = useCamera({ onCapture: ({ blob, durationMs }) => save(blob) });
+
+<button onClick={() => camera.capture().catch(console.error)} disabled={!camera.canCapture}>Capture</button>
+<button onClick={() => camera.captureBurst({ count: 5 }).catch(console.error)}>Burst 5</button>
+<button
+  onPointerDown={(event) => {
+    event.currentTarget.setPointerCapture(event.pointerId); // release lands here even off the button
+    camera.captureBurst().catch(console.error);
+  }}
+  onPointerUp={camera.stopBurst}
+  onPointerCancel={camera.stopBurst}
+  onLostPointerCapture={camera.stopBurst}
+>
+  Hold to shoot
+</button>
+```
+
+The returned methods keep a stable identity, so they are safe in effect dependencies. Shots queue instead of overlapping, bursts stop on `count`, `stopBurst()`, an abort `signal`, or `stop()`. See the [core rapid capture docs](https://github.com/SushilSubedi/continuous-camera#rapid-capture).
 
 ### `<CameraPreview stream={stream} mirror? />`
 
