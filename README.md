@@ -23,6 +23,9 @@ A lightweight, framework-agnostic camera library with first-class React support.
 |---|---|---|
 | [`@continuous-camera/core`](./packages/core) | 0.2.0 | Framework-agnostic camera API |
 | [`@continuous-camera/react`](./packages/react) | 0.2.0 | React hooks & components |
+| [`@continuous-camera/react-native`](./packages/react-native) | Unreleased | Native camera hooks & preview using VisionCamera 5 |
+
+React Native support is available as an initial workspace package. See the [native setup and usage guide](./packages/react-native/README.md) for integration; the browser packages remain independent.
 
 ## Installation
 
@@ -279,6 +282,7 @@ Requires browsers with [MediaDevices.getUserMedia()](https://caniuse.com/stream)
 See the [`examples/`](./examples) directory:
 
 - **[Next.js Demo](./examples/nextjs-demo)** — Full demo with capture gallery, bursts, and hold-to-shoot
+- **[Expo Demo](./examples/expo-demo)** — Android/iOS camera app with tap, burst and hold-to-shoot, Fast/HD modes and a local gallery
 
 ```bash
 cd examples/nextjs-demo
