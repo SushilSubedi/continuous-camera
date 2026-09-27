@@ -1,4 +1,4 @@
-import { Camera } from "./camera";
+import { Camera, CaptureBurstError } from "./camera";
 import type {
   CameraOptions,
   CameraState,
@@ -6,11 +6,14 @@ import type {
   CameraEventMap,
   CameraEventHandler,
   CaptureOptions,
+  CaptureBurstOptions,
+  CapturedPhoto,
+  CaptureQueueState,
   CropRegion,
   Resolution,
 } from "./types";
 
-export { Camera };
+export { Camera, CaptureBurstError };
 export { isMediaDevicesSupported, isBrowser } from "./utils";
 export type {
   CameraOptions,
@@ -19,6 +22,9 @@ export type {
   CameraEventMap,
   CameraEventHandler,
   CaptureOptions,
+  CaptureBurstOptions,
+  CapturedPhoto,
+  CaptureQueueState,
   CropRegion,
   Resolution,
 };

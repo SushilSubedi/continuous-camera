@@ -29,6 +29,10 @@ document.querySelector('video').srcObject = stream;
 // Capture a photo
 const blob = await camera.capture({ format: 'image/jpeg', quality: 0.9 });
 
+// Rapid capture: shots queue instead of overlapping; every photo is emitted as it lands
+camera.on('capture', ({ blob, durationMs }) => upload(blob));
+await camera.captureBurst({ count: 5, interval: 200 });
+
 // Listen to events
 camera.on('statechange', (state) => console.log('State:', state));
 

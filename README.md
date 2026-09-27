@@ -10,6 +10,7 @@ A lightweight, framework-agnostic camera library with first-class React support.
 ## Features
 
 - 📸 **Simple API** — `start()`, `stop()`, `capture()`, `switchCamera()`
+- ⚡ **Rapid capture** — Queued shots, bursts, and hold-to-shoot with `captureBurst()`
 - ⚛️ **React hooks** — `useCamera()` with automatic cleanup
 - 🌐 **Framework-agnostic** — Works with any JS framework or vanilla JS
 - 🔒 **SSR-safe** — No side effects on import, works with Next.js/Astro SSR
@@ -117,7 +118,9 @@ Factory function that creates a new `Camera` instance.
 |---|---|---|
 | `start()` | `Promise<MediaStream>` | Requests camera access and starts the stream |
 | `stop()` | `void` | Stops all tracks and releases the camera |
-| `capture(options?)` | `Promise<Blob>` | Captures a still frame from the active stream |
+| `capture(options?)` | `Promise<Blob>` | Queues a shot of the active stream and resolves with its Blob |
+| `captureBurst(options?)` | `Promise<Blob[]>` | Captures repeatedly until `count`, `stopBurst()`, `signal`, or `stop()` |
+| `stopBurst()` | `void` | Ends a running burst after its in-flight shot |
 | `switchCamera()` | `Promise<MediaStream>` | Toggles between front and back cameras |
 | `selectDevice(deviceId)` | `Promise<MediaStream>` | Switches to a specific camera by deviceId |
 | `applyConstraints(constraints)` | `Promise<void>` | Applies constraints to the active track without restarting |
@@ -134,6 +137,9 @@ Factory function that creates a new `Camera` instance.
 | `stream` | `MediaStream \| null` | The active media stream |
 | `error` | `Error \| null` | The last error encountered |
 | `isActive` | `boolean` | Whether the camera is currently streaming |
+| `pendingCaptures` | `number` | Queued plus in-flight shots |
+| `isBursting` | `boolean` | Whether a burst is running |
+| `maxPendingCaptures` | `number` | The queue limit in effect |
 
 #### `CameraOptions`
 
@@ -144,6 +150,7 @@ interface CameraOptions {
   resolution?: { width: number; height: number }; // Default: 1920×1080
   audio?: boolean;                       // Default: false
   constraints?: MediaStreamConstraints;  // Raw override
+  maxPendingCaptures?: number;           // Default: 10
 }
 ```
 
@@ -158,7 +165,38 @@ interface CaptureOptions {
   mirror?: boolean;   // Default: false
   rotate?: 0 | 90 | 180 | 270; // Default: 0
 }
+
+interface CaptureBurstOptions extends CaptureOptions {
+  count?: number;       // Default: unlimited
+  interval?: number;    // Minimum ms between shot starts. Default: 0
+  signal?: AbortSignal; // Ends the burst
+}
 ```
+
+#### Rapid capture
+
+```ts
+camera.on('capture', ({ blob, durationMs }) => save(blob));
+
+await camera.capture();                                // Tap: queue one shot
+await camera.captureBurst({ count: 5, interval: 200 }); // Burst
+
+// Hold to shoot until release. Pointer capture keeps the release on the button,
+// and cancel/lost-capture cover gestures the browser takes over.
+button.addEventListener('pointerdown', (event) => {
+  button.setPointerCapture(event.pointerId);
+  camera.captureBurst().catch(console.error);
+});
+for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+  button.addEventListener(type, () => camera.stopBurst());
+}
+```
+
+- Shots run one at a time in order. Calling `capture()` while a shot is running queues the next one instead of overlapping it. Beyond `maxPendingCaptures`, `capture()` rejects with `Capture queue is full`.
+- `stop()`, `switchCamera()`, `selectDevice()` and `destroy()` cancel shots that have not started; they reject with `Camera stopped`. A shot already in flight is not cancelled; it resolves or rejects depending on whether the browser finished reading the frame.
+- `stopBurst()` ends the burst after its in-flight shot and frees it at once, so the next `captureBurst()` can start immediately.
+- `captureBurst()` resolves with every photo taken. If a shot fails, it rejects with `CaptureBurstError`, whose `photos` holds the shots already taken. Every photo is also emitted as `capture`, so handle each one in a single place.
+- Without the `ImageCapture` API (Safari, Firefox), frames are drawn from one reused video element, so repeated shots skip reloading the stream.
 
 #### Events
 
@@ -170,6 +208,8 @@ interface CaptureOptions {
 | `streamstop` | `void` | Fired when a stream stops |
 | `devicechange` | `MediaDeviceInfo[]` | Fired when a device is added or removed |
 | `trackended` | `void` | Fired when the active video track ends unexpectedly |
+| `capture` | `{ blob: Blob; durationMs: number }` | Fired with every photo as soon as it is encoded |
+| `capturechange` | `{ pending: number; bursting: boolean }` | Fired when pending shots or burst state change |
 
 ### `@continuous-camera/react`
 
