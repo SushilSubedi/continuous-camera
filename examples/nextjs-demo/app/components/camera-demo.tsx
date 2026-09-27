@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo, useRef, type ChangeEvent } from "react";
+import { useState, useEffect, useRef, type ChangeEvent } from "react";
 import { useCamera, CameraPreview, type CapturedPhoto } from "@continuous-camera/react";
 
 const TRACK_PRESETS = [
@@ -43,12 +43,13 @@ export function CameraDemo() {
   const capturesRef = useRef<GalleryPhoto[]>([]);
 
   // Every shot (tap, burst or hold) lands here as soon as it is encoded.
-  const addPhoto = useCallback(({ blob, durationMs }: CapturedPhoto) => {
+  // useCamera reads onCapture through a ref, so a plain function is fine here.
+  function addPhoto({ blob, durationMs }: CapturedPhoto) {
     const next = [{ url: URL.createObjectURL(blob), durationMs }, ...capturesRef.current];
     next.splice(MAX_GALLERY).forEach((photo) => URL.revokeObjectURL(photo.url));
     capturesRef.current = next;
     setCaptures(next);
-  }, []);
+  }
 
   const {
     camera,
@@ -79,22 +80,13 @@ export function CameraDemo() {
   const [settings, setSettings] = useState<MediaTrackSettings | null>(null);
   const [capabilities, setCapabilities] = useState<MediaTrackCapabilities | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [holding, setHolding] = useState(false);
 
-  const refreshTrackInfo = useCallback(() => {
+  // useCamera's methods are stable, so effects can depend on them directly.
+  function refreshTrackInfo() {
     setSettings(getSettings());
     setCapabilities(getCapabilities());
-  }, [getCapabilities, getSettings]);
-
-  const syncDevices = useCallback(
-    async (nextDevices?: MediaDeviceInfo[]) => {
-      const resolvedDevices = nextDevices ?? (await getDevices());
-      const activeDeviceId = getSettings()?.deviceId;
-
-      setDevices(resolvedDevices);
-      setSelectedDeviceId(activeDeviceId ?? resolvedDevices[0]?.deviceId ?? "");
-    },
-    [getDevices, getSettings],
-  );
+  }
 
   useEffect(() => {
     return () => {
@@ -143,12 +135,14 @@ export function CameraDemo() {
     }
 
     const unsubscribeDeviceChange = camera.on("devicechange", (nextDevices) => {
-      void syncDevices(nextDevices);
+      setDevices(nextDevices);
+      setSelectedDeviceId(getSettings()?.deviceId ?? nextDevices[0]?.deviceId ?? "");
       setNotice("Camera list updated.");
     });
 
     const unsubscribeTrackEnded = camera.on("trackended", () => {
-      refreshTrackInfo();
+      setSettings(getSettings());
+      setCapabilities(getCapabilities());
       setNotice("The active camera stream ended.");
     });
 
@@ -156,96 +150,97 @@ export function CameraDemo() {
       unsubscribeDeviceChange();
       unsubscribeTrackEnded();
     };
-  }, [camera, refreshTrackInfo, syncDevices]);
+  }, [camera, getCapabilities, getSettings]);
 
-  const handleStart = useCallback(async () => {
+  async function handleStart() {
     setNotice(null);
     await start();
     refreshTrackInfo();
-  }, [refreshTrackInfo, start]);
+  }
 
-  const handleStop = useCallback(() => {
+  function handleStop() {
     stop();
     setNotice(null);
-  }, [stop]);
+  }
 
-  const clearCaptures = useCallback(() => {
+  function clearCaptures() {
     capturesRef.current.forEach((photo) => URL.revokeObjectURL(photo.url));
     capturesRef.current = [];
     setCaptures([]);
-  }, []);
+  }
 
-  const applyTrackPreset = useCallback(
-    async (width: number, height: number, label: string) => {
-      try {
-        await applyConstraints({
-          width: { ideal: width },
-          height: { ideal: height },
-        });
-        refreshTrackInfo();
-        setNotice(`Applied ${label} track preference.`);
-      } catch (err) {
-        setNotice(err instanceof Error ? err.message : "Unable to apply constraints.");
-      }
-    },
-    [applyConstraints, refreshTrackInfo],
-  );
+  async function applyTrackPreset(width: number, height: number, label: string) {
+    try {
+      await applyConstraints({
+        width: { ideal: width },
+        height: { ideal: height },
+      });
+      refreshTrackInfo();
+      setNotice(`Applied ${label} track preference.`);
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Unable to apply constraints.");
+    }
+  }
 
-  const handleSwitchCamera = useCallback(async () => {
+  async function handleSwitchCamera() {
     setNotice(null);
     await switchCamera();
     refreshTrackInfo();
-  }, [refreshTrackInfo, switchCamera]);
+  }
 
-  const handleDeviceChange = useCallback(
-    async (event: ChangeEvent<HTMLSelectElement>) => {
-      const deviceId = event.target.value;
-      if (!deviceId) {
-        return;
-      }
+  async function handleDeviceChange(event: ChangeEvent<HTMLSelectElement>) {
+    const deviceId = event.target.value;
+    if (!deviceId) {
+      return;
+    }
 
-      await selectDevice(deviceId);
-      setSelectedDeviceId(deviceId);
-      refreshTrackInfo();
-      setNotice("Switched to the selected camera.");
-    },
-    [refreshTrackInfo, selectDevice],
-  );
+    await selectDevice(deviceId);
+    setSelectedDeviceId(deviceId);
+    refreshTrackInfo();
+    setNotice("Switched to the selected camera.");
+  }
 
-  const captureOptions = useMemo(
-    () => ({
-      format: "image/jpeg" as const,
-      quality: 0.9,
-      crop: captureMode === "square" ? getCenteredSquareCrop(settings) : undefined,
-      resize: captureMode === "square" ? { width: 1080, height: 1080 } : undefined,
-      mirror: mirror || undefined,
-      rotate: rotate || undefined,
-    }),
-    [captureMode, mirror, rotate, settings],
-  );
+  const captureOptions = {
+    format: "image/jpeg" as const,
+    quality: 0.9,
+    crop: captureMode === "square" ? getCenteredSquareCrop(settings) : undefined,
+    resize: captureMode === "square" ? { width: 1080, height: 1080 } : undefined,
+    mirror: mirror || undefined,
+    rotate: rotate || undefined,
+  };
 
-  const reportCaptureError = useCallback((err: unknown) => {
+  function reportCaptureError(err: unknown) {
     console.error("Capture failed:", err);
     setNotice(err instanceof Error ? err.message : "Capture failed.");
-  }, []);
+  }
 
   // Tapping faster than frames encode queues shots rather than dropping them.
-  const handleCapture = useCallback(() => {
+  function handleCapture() {
     capture(captureOptions).catch(reportCaptureError);
-  }, [capture, captureOptions, reportCaptureError]);
+  }
 
-  const handleBurst = useCallback(
-    (count?: number) => {
-      captureBurst({ ...captureOptions, count })
-        .then((photos) => setNotice(`Burst captured ${photos.length} photo${photos.length === 1 ? "" : "s"}.`))
-        .catch(reportCaptureError);
-    },
-    [captureBurst, captureOptions, reportCaptureError],
-  );
+  function handleBurst(count?: number) {
+    captureBurst({ ...captureOptions, count })
+      .then((photos) => setNotice(`Burst captured ${photos.length} photo${photos.length === 1 ? "" : "s"}.`))
+      .catch(reportCaptureError);
+  }
 
-  const cycleRotation = useCallback(() => {
+  // The Hold button only stops a burst it started, so it can't cut a running "Burst 5" short.
+  function startHold() {
+    if (isBursting) return;
+    setHolding(true);
+    handleBurst();
+  }
+
+  function endHold() {
+    if (!holding) return;
+    setHolding(false);
+    stopBurst();
+  }
+
+  function cycleRotation() {
     setRotate((prev) => (((prev + 90) % 360) as 0 | 90 | 180 | 270));
-  }, []);
+  }
 
   const previewMirror = settings?.facingMode !== "environment";
   const widthRange = formatRange(capabilities?.width as MediaSettingsRange | undefined);
@@ -363,21 +358,24 @@ export function CameraDemo() {
                 onPointerDown={(event) => {
                   // Keeps pointerup on this button even if the pointer drifts off it.
                   event.currentTarget.setPointerCapture(event.pointerId);
-                  handleBurst();
+                  startHold();
                 }}
-                onPointerUp={stopBurst}
-                onPointerCancel={stopBurst}
+                onPointerUp={endHold}
+                onPointerCancel={endHold}
+                onLostPointerCapture={endHold}
                 onKeyDown={(event) => {
-                  if ((event.key === " " || event.key === "Enter") && !event.repeat) handleBurst();
+                  if ((event.key === " " || event.key === "Enter") && !event.repeat) startHold();
                 }}
-                onKeyUp={stopBurst}
-                onBlur={stopBurst}
-                disabled={!isBursting && !canCapture}
+                onKeyUp={endHold}
+                onBlur={endHold}
+                // Stays enabled while held so the release always reaches endHold.
+                disabled={!holding && (isBursting || !canCapture)}
+                aria-pressed={holding && isBursting}
                 className={`touch-none select-none rounded-full px-5 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${
-                  isBursting ? "bg-blue-500 text-white" : "border border-white/15 bg-white/5 text-white hover:bg-white/10"
+                  holding && isBursting ? "bg-blue-500 text-white" : "border border-white/15 bg-white/5 text-white hover:bg-white/10"
                 }`}
               >
-                {isBursting ? "Shooting…" : "Hold to shoot"}
+                {holding && isBursting ? "Shooting…" : "Hold to shoot"}
               </button>
               <button
                 onClick={() => void handleSwitchCamera()}
@@ -395,9 +393,9 @@ export function CameraDemo() {
           )}
         </div>
 
-        {pendingCaptures > 1 ? (
-          <p className="text-xs text-white/55">{pendingCaptures} shots queued</p>
-        ) : null}
+        <p aria-live="polite" className="min-h-4 text-xs text-white/55">
+          {pendingCaptures > 1 ? `${pendingCaptures} shots queued` : ""}
+        </p>
       </section>
 
       <section className="space-y-4 rounded-[2rem] border border-white/10 bg-white/5 p-4 shadow-[0_20px_60px_rgba(0,0,0,0.25)] backdrop-blur-sm">

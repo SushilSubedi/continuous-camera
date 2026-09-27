@@ -233,4 +233,32 @@ describe('useCamera', () => {
     await act(async () => { void result.current.capture(); });
     expect(result.current.canCapture).toBe(false);
   });
+
+  it('keeps method identities stable across renders and camera rebuilds', async () => {
+    setupMediaDevices();
+    const { result, rerender } = renderHook(({ facingMode }) => useCamera({ facingMode }), {
+      initialProps: { facingMode: 'user' as 'user' | 'environment' },
+    });
+    const { capture, captureBurst, stopBurst, start } = result.current;
+    rerender({ facingMode: 'environment' });
+    expect(result.current.capture).toBe(capture);
+    expect(result.current.captureBurst).toBe(captureBurst);
+    expect(result.current.stopBurst).toBe(stopBurst);
+    expect(result.current.start).toBe(start);
+  });
+
+  it('resets state when changed options rebuild the camera', async () => {
+    setupMediaDevices();
+    const { result, rerender } = renderHook(({ facingMode }) => useCamera({ facingMode }), {
+      initialProps: { facingMode: 'user' as 'user' | 'environment' },
+    });
+    await act(async () => { await result.current.start(); });
+    expect(result.current.canCapture).toBe(true);
+
+    rerender({ facingMode: 'environment' });
+    expect(result.current.state).toBe('idle');
+    expect(result.current.stream).toBeNull();
+    expect(result.current.isActive).toBe(false);
+    expect(result.current.canCapture).toBe(false);
+  });
 });

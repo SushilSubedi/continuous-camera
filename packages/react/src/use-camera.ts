@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Camera } from '@continuous-camera/core';
 import type {
   CameraOptions,
@@ -75,6 +75,10 @@ export function useCamera(options: UseCameraOptions = {}): UseCameraReturn {
   useEffect(() => {
     const cam = new Camera(cameraOptions);
     cameraRef.current = cam;
+    // A rebuilt camera starts idle; drop the previous camera's state and stream.
+    setState(cam.state);
+    setStream(null);
+    setError(null);
     setPendingCaptures(0);
     setIsBursting(false);
 
@@ -100,77 +104,38 @@ export function useCamera(options: UseCameraOptions = {}): UseCameraReturn {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [optionsKey]);
 
-  const start = useCallback(async () => {
-    if (!cameraRef.current) throw new Error('Camera not initialized');
-    return cameraRef.current.start();
-  }, []);
-
-  const stop = useCallback(() => {
-    cameraRef.current?.stop();
-  }, []);
-
-  const switchCamera = useCallback(async () => {
-    if (!cameraRef.current) throw new Error('Camera not initialized');
-    return cameraRef.current.switchCamera();
-  }, []);
-
-  const selectDevice = useCallback(async (deviceId: string) => {
-    if (!cameraRef.current) throw new Error('Camera not initialized');
-    return cameraRef.current.selectDevice(deviceId);
-  }, []);
-
-  const applyConstraints = useCallback(async (constraints: MediaTrackConstraints) => {
-    if (!cameraRef.current) throw new Error('Camera not initialized');
-    return cameraRef.current.applyConstraints(constraints);
-  }, []);
-
-  const getCapabilities = useCallback(() => {
-    return cameraRef.current?.getCapabilities() ?? null;
-  }, []);
-
-  const getSettings = useCallback(() => {
-    return cameraRef.current?.getSettings() ?? null;
-  }, []);
-
-  const capture = useCallback(async (captureOptions?: CaptureOptions) => {
-    if (!cameraRef.current) throw new Error('Camera not initialized');
-    return cameraRef.current.capture(captureOptions);
-  }, []);
-
-  const captureBurst = useCallback(async (burstOptions?: CaptureBurstOptions) => {
-    if (!cameraRef.current) throw new Error('Camera not initialized');
-    return cameraRef.current.captureBurst(burstOptions);
-  }, []);
-
-  const stopBurst = useCallback(() => {
-    cameraRef.current?.stopBurst();
-  }, []);
-
-  const getDevices = useCallback(async () => {
-    if (!cameraRef.current) return [];
-    return cameraRef.current.getDevices();
-  }, []);
+  // Created once and read through cameraRef, so the methods keep a stable identity across
+  // renders and camera rebuilds without per-method useCallback.
+  const [actions] = useState(() => {
+    const require = () => {
+      if (!cameraRef.current) throw new Error('Camera not initialized');
+      return cameraRef.current;
+    };
+    return {
+      start: async () => require().start(),
+      stop: () => cameraRef.current?.stop(),
+      switchCamera: async () => require().switchCamera(),
+      selectDevice: async (deviceId: string) => require().selectDevice(deviceId),
+      applyConstraints: async (constraints: MediaTrackConstraints) => require().applyConstraints(constraints),
+      getCapabilities: () => cameraRef.current?.getCapabilities() ?? null,
+      getSettings: () => cameraRef.current?.getSettings() ?? null,
+      capture: async (captureOptions?: CaptureOptions) => require().capture(captureOptions),
+      captureBurst: async (burstOptions?: CaptureBurstOptions) => require().captureBurst(burstOptions),
+      stopBurst: () => cameraRef.current?.stopBurst(),
+      getDevices: async () => cameraRef.current?.getDevices() ?? [],
+    };
+  });
 
   return {
     state,
     stream,
     error,
     isActive: state === 'active',
-    start,
-    stop,
-    switchCamera,
-    selectDevice,
-    applyConstraints,
-    getCapabilities,
-    getSettings,
-    capture,
-    captureBurst,
-    stopBurst,
+    ...actions,
     pendingCaptures,
     isCapturing: pendingCaptures > 0,
     isBursting,
-    canCapture: state === 'active' && pendingCaptures < (cameraOptions.maxPendingCaptures ?? 10),
-    getDevices,
+    canCapture: state === 'active' && !!cameraRef.current && pendingCaptures < cameraRef.current.maxPendingCaptures,
     camera: cameraRef.current!,
   };
 }

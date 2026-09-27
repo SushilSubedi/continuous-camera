@@ -51,12 +51,22 @@ Accepts all `CameraOptions` plus `onCapture`, which receives every photo as it l
 ```tsx
 const camera = useCamera({ onCapture: ({ blob, durationMs }) => save(blob) });
 
-<button onClick={() => camera.capture()} disabled={!camera.canCapture}>Capture</button>
-<button onClick={() => camera.captureBurst({ count: 5 })}>Burst 5</button>
-<button onPointerDown={() => camera.captureBurst()} onPointerUp={camera.stopBurst}>Hold to shoot</button>
+<button onClick={() => camera.capture().catch(console.error)} disabled={!camera.canCapture}>Capture</button>
+<button onClick={() => camera.captureBurst({ count: 5 }).catch(console.error)}>Burst 5</button>
+<button
+  onPointerDown={(event) => {
+    event.currentTarget.setPointerCapture(event.pointerId); // release lands here even off the button
+    camera.captureBurst().catch(console.error);
+  }}
+  onPointerUp={camera.stopBurst}
+  onPointerCancel={camera.stopBurst}
+  onLostPointerCapture={camera.stopBurst}
+>
+  Hold to shoot
+</button>
 ```
 
-Shots queue instead of overlapping, bursts stop on `count`, `stopBurst()`, an abort `signal`, or `stop()`. See the [core rapid capture docs](https://github.com/SushilSubedi/continuous-camera#rapid-capture).
+The returned methods keep a stable identity, so they are safe in effect dependencies. Shots queue instead of overlapping, bursts stop on `count`, `stopBurst()`, an abort `signal`, or `stop()`. See the [core rapid capture docs](https://github.com/SushilSubedi/continuous-camera#rapid-capture).
 
 ### `<CameraPreview stream={stream} mirror? />`
 
